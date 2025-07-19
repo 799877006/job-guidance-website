@@ -40,6 +40,7 @@ export default function RegisterPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    console.log("开始提交注册表单");
     setLoading(true)
     setError("")
 
@@ -56,21 +57,38 @@ export default function RegisterPage() {
     }
 
     try {
-      await signUp(formData.email, formData.password, {
+      console.log("登録処理開始");
+      const result = await signUp(formData.email, formData.password, {
         full_name: formData.fullName,
-        role: formData.role,
+        role: formData.role || "student",
         university: formData.university,
         major: formData.major,
-      })
-
+      });
+      
+      console.log("登録成功:", result);
+      setLoading(false)
+      
       toast({
         title: "アカウント作成成功",
         description: "確認メールをお送りしました。メールを確認してアカウントを有効化してください。",
       })
+      
+      console.log("ログインページに移動");
       router.push("/login")
     } catch (err: any) {
-      setError(err.message || "アカウント作成に失敗しました")
-    } finally {
+      console.error("登録エラー:", err);
+      
+      // 重复邮箱的特殊处理
+      if (err.message.includes('このメールアドレスは既に登録されています')) {
+        setError("このメールアドレスは既に登録されています。ログインページからサインインしてください。")
+        // 3秒后自动跳转到登录页面
+        setTimeout(() => {
+          router.push("/login")
+        }, 3000)
+      } else {
+        setError(err.message || "アカウント作成に失敗しました。再度お試しください。")
+      }
+      
       setLoading(false)
     }
   }
@@ -89,7 +107,16 @@ export default function RegisterPage() {
         <CardContent>
           {error && (
             <Alert className="mb-4" variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
+              <AlertDescription>
+                {error}
+                {error.includes('このメールアドレスは既に登録されています') && (
+                  <div className="mt-2">
+                    <Link href="/login" className="text-blue-600 hover:underline font-medium">
+                      今すぐログインする →
+                    </Link>
+                  </div>
+                )}
+              </AlertDescription>
             </Alert>
           )}
 

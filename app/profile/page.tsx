@@ -90,15 +90,16 @@ export default function ProfilePage() {
       const file = event.target.files[0]
       const fileExt = file.name.split(".").pop()
       const fileName = `${user!.id}-${Math.random()}.${fileExt}`
-      const filePath = `avatars/${fileName}`
 
-      const { error: uploadError } = await supabase.storage.from("profiles").upload(filePath, file)
+      // 直接上传到 avatars 存储桶
+      const { error: uploadError } = await supabase.storage.from("avatars").upload(fileName, file)
 
       if (uploadError) {
         throw uploadError
       }
 
-      const { data } = supabase.storage.from("profiles").getPublicUrl(filePath)
+      // 获取公共URL
+      const { data } = supabase.storage.from("avatars").getPublicUrl(fileName)
 
       await updateProfile(user!.id, {
         avatar_url: data.publicUrl,
@@ -131,16 +132,17 @@ export default function ProfilePage() {
 
       const file = event.target.files[0]
       const fileExt = file.name.split(".").pop()
-      const fileName = `${user!.id}-resume-${Math.random()}.${fileExt}`
-      const filePath = `resumes/${fileName}`
+      const fileName = `${user!.id}-${Math.random()}.${fileExt}`
 
-      const { error: uploadError } = await supabase.storage.from("profiles").upload(filePath, file)
+      // 直接上传到 resumes 存储桶
+      const { error: uploadError } = await supabase.storage.from("resumes").upload(fileName, file)
 
       if (uploadError) {
         throw uploadError
       }
 
-      const { data } = supabase.storage.from("profiles").getPublicUrl(filePath)
+      // 获取URL（简历不需要公开访问）
+      const { data } = supabase.storage.from("resumes").getPublicUrl(fileName)
 
       await updateProfile(user!.id, {
         resume_url: data.publicUrl,

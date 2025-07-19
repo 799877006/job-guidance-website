@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { createContext, useContext, useEffect, useState } from "react"
-import type { User } from "@supabase/supabase-js"
+import type { User, AuthChangeEvent } from "@supabase/supabase-js"
 import { supabase, type Profile } from "@/lib/supabase"
 import { getProfile } from "@/lib/auth"
 
@@ -30,36 +30,76 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refreshProfile = async () => {
     if (user) {
-      const profileData = await getProfile(user.id)
-      setProfile(profileData)
+      try {
+        const profileData = await getProfile(user.id)
+        setProfile(profileData)
+      } catch (error) {
+        console.error("获取 profile 失败:", error)
+      }
     }
   }
 
   useEffect(() => {
+    let mounted = true
+
     // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null)
-      if (session?.user) {
-        getProfile(session.user.id).then(setProfile)
+    const initializeAuth = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        
+        if (mounted) {
+          setUser(session?.user ?? null)
+          
+          if (session?.user) {
+            // 只在非注册页面获取 profile
+            const currentPath = window.location.pathname
+            if (currentPath !== '/register') {
+              const profileData = await getProfile(session.user.id)
+              setProfile(profileData)
+            }
+          }
+          
+          setLoading(false)
+        }
+      } catch (error) {
+        console.error("初始化认证状态失败:", error)
+        if (mounted) {
+          setLoading(false)
+        }
       }
-      setLoading(false)
-    })
+    }
+
+    initializeAuth()
 
     // Listen for auth changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event: AuthChangeEvent, session) => {
+      if (!mounted) return
+
       setUser(session?.user ?? null)
+      
       if (session?.user) {
-        const profileData = await getProfile(session.user.id)
-        setProfile(profileData)
+        // 只在特定的认证事件下获取 profile
+        const shouldFetchProfile = ['SIGNED_IN', 'TOKEN_REFRESHED', 'USER_UPDATED'].includes(event);
+        
+        if (shouldFetchProfile) {
+          try {
+            const profileData = await getProfile(session.user.id)
+            setProfile(profileData)
+          } catch (error) {
+            console.error("获取 profile 失败:", error)
+          }
+        }
       } else {
         setProfile(null)
       }
+      
       setLoading(false)
     })
 
-    return () => subscription.unsubscribe()
+    return () => {
+      mounted = false
+      subscription.unsubscribe()
+    }
   }, [])
 
   const handleSignOut = async () => {
