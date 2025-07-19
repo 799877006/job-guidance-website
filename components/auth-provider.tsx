@@ -5,7 +5,7 @@ import type React from "react"
 import { createContext, useContext, useEffect, useState } from "react"
 import type { User, AuthChangeEvent } from "@supabase/supabase-js"
 import { supabase, type Profile } from "@/lib/supabase"
-import { getProfile } from "@/lib/auth"
+import { getProfile, createProfile } from "@/lib/auth"
 
 interface AuthContextType {
   user: User | null
@@ -78,15 +78,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(session?.user ?? null)
       
       if (session?.user) {
-        // 只在特定的认证事件下获取 profile
-        const shouldFetchProfile = ['SIGNED_IN', 'TOKEN_REFRESHED', 'USER_UPDATED'].includes(event);
+        // 检查是否有待创建的 profile
+        const pendingProfile = localStorage.getItem('pendingProfile');
         
-        if (shouldFetchProfile) {
+        if (event === 'SIGNED_IN' && pendingProfile) {
           try {
-            const profileData = await getProfile(session.user.id)
-            setProfile(profileData)
+            // 创建 profile
+            await createProfile(session.user.id);
+            // 获取新创建的 profile
+            const profileData = await getProfile(session.user.id);
+            setProfile(profileData);
           } catch (error) {
-            console.error("获取 profile 失败:", error)
+            console.error("创建 profile 失败:", error);
+            // 清除暂存数据以防止重复尝试
+            localStorage.removeItem('pendingProfile');
+          }
+        } else {
+          // 只在特定的认证事件下获取 profile
+          const shouldFetchProfile = ['SIGNED_IN', 'TOKEN_REFRESHED', 'USER_UPDATED'].includes(event);
+          
+          if (shouldFetchProfile) {
+            try {
+              const profileData = await getProfile(session.user.id)
+              setProfile(profileData)
+            } catch (error) {
+              console.error("获取 profile 失败:", error)
+            }
           }
         }
       } else {

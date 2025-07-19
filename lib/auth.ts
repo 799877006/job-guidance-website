@@ -1,3 +1,4 @@
+import { toast } from "sonner";
 import { supabase } from "./supabase"
 import type { Profile } from "./supabase"
 
@@ -18,7 +19,7 @@ export async function signUp(email: string, password: string, userData: Partial<
       console.error("认证注册错误:", error);
       throw error;
     }
-
+    
     if (!data?.user) {
       throw new Error('ユーザー登録に失敗しました');
     }
@@ -30,9 +31,8 @@ export async function signUp(email: string, password: string, userData: Partial<
       throw new Error('このメールアドレスは既に登録されています。ログインページからサインインしてください。');
     }
 
-    // 3. 创建基础 profile
-    console.log("開始プロフィール作成, ユーザーID:", data.user.id);
-    const newProfileData = {
+    // 3. 将用户数据暂存到 localStorage
+    const pendingProfileData = {
       id: data.user.id,
       email: email,
       role: userData.role || 'student',
@@ -48,25 +48,9 @@ export async function signUp(email: string, password: string, userData: Partial<
       resume_url: null
     };
 
-    console.log("プロフィールデータ:", newProfileData);
+    localStorage.setItem('pendingProfile', JSON.stringify(pendingProfileData));
+    console.log("用户数据已暂存到 localStorage");
 
-    // 4. 插入 profile 数据
-    const { error: profileError } = await supabase
-      .from('profiles')
-      .insert([newProfileData]);
-
-    if (profileError) {
-      console.error("プロフィール作成エラー:", profileError);
-      
-      // 如果是外键约束错误，提供更友好的错误信息
-      if (profileError.code === '23503') {
-        throw new Error('ユーザー登録中にエラーが発生しました。しばらく時間をおいて再度お試しください。');
-      }
-      
-      throw new Error('プロフィールの作成に失敗しました。');
-    }
-
-    console.log("登録処理完了");
     return data;
   } catch (error: any) {
     console.error('登録エラー:', error);
@@ -80,6 +64,47 @@ export async function signUp(email: string, password: string, userData: Partial<
     
     // その他のエラーは一般的なメッセージに変換
     throw new Error('登録に失敗しました。入力内容を確認して再度お試しください。');
+  }
+}
+
+// 新增：创建用户 profile
+export async function createProfile(userId: string) {
+  try {
+    // 从 localStorage 获取暂存的用户数据
+    const pendingProfileData = localStorage.getItem('pendingProfile');
+    if (!pendingProfileData) {
+      throw new Error('プロフィールデータが見つかりません');
+    }
+
+    const profileData = JSON.parse(pendingProfileData);
+    
+    // 确保 userId 匹配
+    if (profileData.id !== userId) {
+      throw new Error('ユーザーIDが一致しません');
+    }
+
+    // 创建 profile
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .insert([profileData]);
+
+    if (profileError) {
+      console.error("プロフィール作成エラー:", profileError);
+      
+      if (profileError.code === '23503') {
+        throw new Error('ユーザー登録中にエラーが発生しました。しばらく時間をおいて再度お試しください。');
+      }
+      
+      throw new Error('プロフィールの作成に失敗しました。');
+    }
+
+    // 成功后清除暂存数据
+    localStorage.removeItem('pendingProfile');
+    
+    return profileData;
+  } catch (error: any) {
+    console.error('プロフィール作成エラー:', error);
+    throw error;
   }
 }
 
