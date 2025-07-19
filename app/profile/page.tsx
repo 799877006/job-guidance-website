@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { ArrowLeft, Upload, Save, User, Mail, Calendar, FileText } from "lucide-react"
+import { ArrowLeft, Upload, Save, User, Mail, Calendar, FileText, X } from "lucide-react"
 import { ProtectedRoute } from "@/components/protected-route"
 import { useAuth } from "@/components/auth-provider"
 import { updateProfile } from "@/lib/auth"
@@ -134,15 +134,25 @@ export default function ProfilePage() {
       const fileExt = file.name.split(".").pop()
       const fileName = `${user!.id}-${Math.random()}.${fileExt}`
 
+      console.log("Attempting to upload resume:", fileName)
+
       // 直接上传到 resumes 存储桶
-      const { error: uploadError } = await supabase.storage.from("resumes").upload(fileName, file)
+      const { error: uploadError } = await supabase.storage
+        .from("resumes")
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: false
+        })
 
       if (uploadError) {
+        console.error("Upload error:", uploadError)
         throw uploadError
       }
 
       // 获取URL（简历不需要公开访问）
-      const { data } = supabase.storage.from("resumes").getPublicUrl(fileName)
+      const { data } = supabase.storage
+        .from("resumes")
+        .getPublicUrl(fileName)
 
       await updateProfile(user!.id, {
         resume_url: data.publicUrl,
@@ -153,15 +163,79 @@ export default function ProfilePage() {
         title: "アップロード完了",
         description: "履歴書をアップロードしました",
       })
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error uploading resume:", error)
+      // 如果是存储错误，显示具体错误信息
+      const errorMessage = error.message && error.message.includes("storage")
+        ? error.message
+        : "ファイルのアップロードに失敗しました"
+      
       toast({
         title: "エラー",
-        description: "ファイルのアップロードに失敗しました",
+        description: errorMessage,
         variant: "destructive",
       })
     } finally {
       setUploading(false)
+    }
+  }
+
+  const handleResumeDelete = async () => {
+    try {
+      setLoading(true)
+      
+      if (!profile?.resume_url) return
+      
+      // 从URL中提取文件名
+      const urlParts = profile.resume_url.split('/')
+      const fileName = urlParts[urlParts.length - 1]
+      
+      if (!fileName) {
+        throw new Error("Invalid file URL")
+      }
+
+      console.log("Attempting to delete resume:", fileName)
+
+      // 从存储中删除文件
+      const { error: deleteError } = await supabase.storage
+        .from("resumes")
+        .remove([fileName])
+
+      if (deleteError) {
+        console.error("Delete error:", deleteError)
+        throw deleteError
+      }
+
+      // 更新用户资料，清除简历URL
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ resume_url: null })
+        .eq('id', user!.id)
+
+      if (updateError) {
+        console.error("Update error:", updateError)
+        throw updateError
+      }
+
+      await refreshProfile()
+      toast({
+        title: "削除完了",
+        description: "履歴書を削除しました",
+      })
+    } catch (error: any) {
+      console.error("Error deleting resume:", error)
+      // 如果是存储错误，显示具体错误信息
+      const errorMessage = error.message && error.message.includes("storage")
+        ? error.message
+        : "履歴書の削除に失敗しました"
+      
+      toast({
+        title: "エラー",
+        description: errorMessage,
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -329,7 +403,18 @@ export default function ProfilePage() {
               {profile?.resume_url ? (
                 <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                   <div className="flex items-center space-x-3">
-                    <FileText className="h-8 w-8 text-blue-600" />
+                    <div className="relative">
+                      <FileText className="h-8 w-8 text-blue-600" />
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="absolute -top-2 -right-2 h-5 w-5 rounded-full bg-red-500 hover:bg-red-600 p-0"
+                        onClick={handleResumeDelete}
+                        disabled={loading}
+                      >
+                        <X className="h-3 w-3 text-white" />
+                      </Button>
+                    </div>
                     <div>
                       <div className="font-medium">履歴書がアップロード済み</div>
                       <div className="text-sm text-gray-600">ファイルを表示または新しいファイルをアップロード</div>
@@ -374,7 +459,7 @@ export default function ProfilePage() {
                     </Button>
                   </div>
                   <p className="text-sm text-gray-500 mt-2">
-                    PDF、Word形式のファイルをアップロードできます（最大10MB）
+                    PDFのファイルをアップロードできます（最大1500KB）
                   </p>
                 </div>
               )}
