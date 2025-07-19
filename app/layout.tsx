@@ -26,6 +26,7 @@ export default function RootLayout({
           {children}
           <Toaster />
         </AuthProvider>
+      <SpeedInsights />
       </body>
     </html>
   )
