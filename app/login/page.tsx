@@ -29,15 +29,30 @@ export default function LoginPage() {
     setError("")
 
     try {
-      await signIn(email, password)
+      // 清理之前的会话数据
+      localStorage.removeItem('supabase.auth.token')
+      localStorage.removeItem('supabase.auth.expires_at')
+      
+      const result = await signIn(email, password)
+      console.log("登录结果:", result)
+      
+      if (!result?.user) {
+        throw new Error("登录失败：未获取到用户信息")
+      }
+
       toast({
         title: "ログイン成功",
         description: "ダッシュボードにリダイレクトしています...",
       })
-      router.push("/dashboard")
+
+      // 等待一小段时间确保状态更新
+      await new Promise(resolve => setTimeout(resolve, 500))
+
+      // 强制刷新页面并跳转
+      window.location.href = "/dashboard"
     } catch (err: any) {
+      console.error("登录错误:", err)
       setError(err.message || "ログインに失敗しました")
-    } finally {
       setLoading(false)
     }
   }
