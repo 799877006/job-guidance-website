@@ -83,6 +83,16 @@ export default function DashboardPage() {
     }
   }
 
+  const getInterviewStatus = (currentStatus: string, interviewType: string, interviewDate: Date) => {
+    // 如果面试日期在未来
+    if (interviewDate > new Date()) {
+      // 根据面试类型判断状态
+          return 'scheduled';
+    }
+    // 如果面试日期已过，显示为完了
+    return 'completed';
+  };
+
   const fetchStudentDashboardData = async () => {
     if (!user) return;
 
@@ -101,9 +111,79 @@ export default function DashboardPage() {
         .gte('scheduled_date', todayTokyoString)
         .order("scheduled_date", { ascending: true });
 
-      if (interviews) {
-        setUpcomingInterviews(interviews);
+      // 获取应聘记录中的面试信息
+      const { data: applications } = await supabase
+        .from("applications")
+        .select(`
+          id,
+          company_name,
+          first_interview_at,
+          second_interview_at,
+          final_interview_at,
+          status
+        `)
+        .eq("user_id", user.id)
+        .neq("status", "不合格")
+        .or(`first_interview_at.gte.${todayTokyoString},second_interview_at.gte.${todayTokyoString},final_interview_at.gte.${todayTokyoString}`)
+
+
+      console.log('Found applications:', applications); // 添加调试日志
+
+      // 合并面试信息
+      let allInterviews = [...(interviews || [])];
+
+      // 添加应聘记录中的面试
+      if (applications) {
+        applications.forEach(app => {
+          // 添加一次面试
+          if (app.first_interview_at && new Date(app.first_interview_at) >= new Date(todayTokyoString)) {
+            const interviewDate = new Date(app.first_interview_at);
+            allInterviews.push({
+              id: `first_${app.id}`,
+              company_name: app.company_name,
+              scheduled_date: format(interviewDate, 'yyyy-MM-dd'),
+              scheduled_time: format(interviewDate, 'HH:mm:ss'),
+              interview_type: '一次面接',
+              status: getInterviewStatus(app.status, '一次面接', interviewDate)
+            });
+          }
+
+          // 添加二次面试
+          if (app.second_interview_at && new Date(app.second_interview_at) >= new Date(todayTokyoString)) {
+            const interviewDate = new Date(app.second_interview_at);
+            allInterviews.push({
+              id: `second_${app.id}`,
+              company_name: app.company_name,
+              scheduled_date: format(interviewDate, 'yyyy-MM-dd'),
+              scheduled_time: format(interviewDate, 'HH:mm:ss'),
+              interview_type: '二次面接',
+              status: getInterviewStatus(app.status, '二次面接', interviewDate)
+            });
+          }
+
+          // 添加最终面试
+          if (app.final_interview_at && new Date(app.final_interview_at) >= new Date(todayTokyoString)) {
+            const interviewDate = new Date(app.final_interview_at);
+            allInterviews.push({
+              id: `final_${app.id}`,
+              company_name: app.company_name,
+              scheduled_date: format(interviewDate, 'yyyy-MM-dd'),
+              scheduled_time: format(interviewDate, 'HH:mm:ss'),
+              interview_type: '最終面接',
+              status: getInterviewStatus(app.status, '最終面接', interviewDate)
+            });
+          }
+        });
       }
+
+      // 按日期和时间排序
+      allInterviews.sort((a, b) => {
+        const dateA = `${a.scheduled_date} ${a.scheduled_time}`;
+        const dateB = `${b.scheduled_date} ${b.scheduled_time}`;
+        return dateA.localeCompare(dateB);
+      });
+
+      setUpcomingInterviews(allInterviews);
 
       // 获取最新求人信息
       const jobAds = await getLatestJobAdvertisements(5);

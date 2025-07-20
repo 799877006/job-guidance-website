@@ -5,13 +5,13 @@ import { Calendar, Users, BarChart3, MessageSquare, User, Briefcase, Star, Arrow
 
 export default function HomePage() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+    <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100">
       {/* Header */}
       <header className="bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-6">
             <div className="flex items-center">
-              <Briefcase className="h-8 w-8 text-blue-600 mr-2" />
+              <Briefcase className="h-8 w-8 text-green-600 mr-2" />
               <h1 className="text-2xl font-bold text-gray-900">向日offer</h1>
             </div>
             <div className="flex space-x-4">
@@ -31,7 +31,7 @@ export default function HomePage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-5xl font-bold text-gray-900 mb-6">
             あなたの就職活動を
-            <span className="text-blue-600">全面サポート</span>
+            <span className="text-green-600">全面サポート</span>
           </h2>
           <p className="text-xl text-gray-600 mb-8 max-w-3xl mx-auto">
             面接スケジュール管理から選考状況の統計まで、就職活動に必要な全ての機能を一つのプラットフォームで。
@@ -103,7 +103,7 @@ export default function HomePage() {
 
             <Card className="hover:shadow-lg transition-shadow">
               <CardHeader>
-                <Briefcase className="h-10 w-10 text-indigo-600 mb-2" />
+                <Briefcase className="h-10 w-10 text-green-600 mb-2" />
                 <CardTitle>求人広告</CardTitle>
                 <CardDescription>企業からの最新求人情報を効率的に閲覧・管理。</CardDescription>
               </CardHeader>
@@ -172,10 +172,10 @@ export default function HomePage() {
       </section>
 
       {/* CTA Section */}
-      <section className="py-16 bg-blue-600">
+      <section className="py-16 bg-green-600">
         <div className="max-w-4xl mx-auto text-center px-4 sm:px-6 lg:px-8">
           <h3 className="text-3xl font-bold text-white mb-4">今すぐ就職活動を始めましょう</h3>
-          <p className="text-xl text-blue-100 mb-8">無料でアカウントを作成して、効率的な就職活動をスタート</p>
+          <p className="text-xl text-green-100 mb-8">無料でアカウントを作成して、効率的な就職活動をスタート</p>
           <Link href="/register">
             <Button size="lg" variant="secondary" className="text-lg px-8 py-3">
               無料で始める

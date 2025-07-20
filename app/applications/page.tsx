@@ -11,9 +11,11 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ApplicationStatus, ApplicationWithDetails } from '@/lib/types/application';
 import { getApplications, getApplicationsByStatus, createApplication, updateApplication, createApplicationDetails, updateApplicationDetails } from '@/lib/application';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
+import { formatInTimeZone } from 'date-fns-tz';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
+import { createSchedule, updateSchedule, getStudentSchedule } from '@/lib/student-schedule';
 
 // 主要内容组件
 function ApplicationsContent() {
@@ -113,6 +115,140 @@ function ApplicationsContent() {
     '不合格': '不合格'
   };
 
+  // 格式化日期时间为本地时间
+  const formatDateTime = (dateStr: string | null) => {
+    if (!dateStr) return '';
+    try {
+      const date = parseISO(dateStr);
+      console.log('Formatting date:', {
+        original: dateStr,
+        parsed: date,
+        formatted: formatInTimeZone(date, 'Asia/Tokyo', "yyyy-MM-dd'T'HH:mm")
+      });
+      return formatInTimeZone(date, 'Asia/Tokyo', "yyyy-MM-dd'T'HH:mm");
+    } catch (error) {
+      console.error('Error formatting date:', dateStr, error);
+      return '';
+    }
+  };
+
+  // 将本地时间转换为 UTC
+  const toUTCDateTime = (localDateStr: string) => {
+    if (!localDateStr) return null;
+    try {
+      const date = new Date(localDateStr);
+      const utcDate = date.toISOString();
+      console.log('Converting to UTC:', {
+        local: localDateStr,
+        utc: utcDate
+      });
+      return utcDate;
+    } catch (error) {
+      console.error('Error converting to UTC:', localDateStr, error);
+      return null;
+    }
+  };
+
+  // 同步面试日程到日程表
+  const syncInterviewToSchedule = async (
+    userId: string,
+    companyName: string,
+    interviewDate: string | null,
+    interviewType: '一次' | '二次' | '最終'
+  ) => {
+    try {
+      if (!interviewDate) {
+        // 如果面试日期被清空，不需要创建日程
+        return;
+      }
+
+      // 准备日程数据
+      const parsedDate = parseISO(interviewDate);
+      const scheduleData = {
+        student_id: userId,
+        date: format(parsedDate, 'yyyy-MM-dd'),
+        start_time: format(parsedDate, 'HH:mm'),
+        end_time: format(new Date(parsedDate.getTime() + 60 * 60 * 1000), 'HH:mm'), // 默认1小时
+        schedule_type: 'interview' as const,
+        title: `${companyName} - ${interviewType}面接`,
+        description: `${companyName}の${interviewType}面接`,
+        color: '#3b82f6' // 蓝色
+      };
+
+      // 创建新日程
+      await createSchedule(scheduleData);
+
+    } catch (error) {
+      console.error('Failed to sync interview schedule:', error);
+      throw error; // 向上传递错误
+    }
+  };
+
+  // 修改面试日期处理函数
+  const handleInterviewDateChange = async (
+    appId: string,
+    interviewType: '一次' | '二次' | '最終',
+    dateValue: string | null,
+    companyName: string
+  ) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('認証が必要です');
+
+      console.log('Handling interview date change:', {
+        appId,
+        interviewType,
+        dateValue,
+        companyName
+      });
+
+      const updateData: any = {};
+      const utcDate = dateValue ? toUTCDateTime(dateValue) : null;
+
+      // 更新面试日期和状态
+      switch (interviewType) {
+        case '一次':
+          updateData.first_interview_at = utcDate;
+          updateData.status = utcDate ? '一次面接待ち' : '書類選考中';
+          break;
+        case '二次':
+          updateData.second_interview_at = utcDate;
+          updateData.status = utcDate ? '二次面接待ち' : '一次面接完了';
+          break;
+        case '最終':
+          updateData.final_interview_at = utcDate;
+          updateData.status = utcDate ? '最終面接待ち' : '二次面接完了';
+          break;
+      }
+
+      console.log('Updating application with:', updateData);
+
+      // 更新应聘记录
+      await updateApplication(appId, updateData);
+      
+      // 同步到日程表
+      await syncInterviewToSchedule(
+        user.id,
+        companyName,
+        utcDate,
+        interviewType
+      );
+
+      await loadApplications();
+      toast({
+        title: "更新完了",
+        description: dateValue ? "面接日程を設定しました" : "面接日程をキャンセルしました",
+      });
+    } catch (error) {
+      console.error('Failed to update interview date:', error);
+      toast({
+        title: "エラー",
+        description: "面接日程の更新に失敗しました",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <div className="container mx-auto py-8">
       <div className="flex justify-between items-center mb-6">
@@ -183,8 +319,8 @@ function ApplicationsContent() {
                     </SelectContent>
                   </Select>
                 </TableCell>
-                <TableCell>{format(new Date(app.applied_at), 'yyyy/MM/dd')}</TableCell>
-                <TableCell>{format(new Date(app.updated_at), 'yyyy/MM/dd')}</TableCell>
+                <TableCell>{formatInTimeZone(new Date(app.applied_at), 'Asia/Tokyo', 'yyyy/MM/dd')}</TableCell>
+                <TableCell>{formatInTimeZone(new Date(app.updated_at), 'Asia/Tokyo', 'yyyy/MM/dd')}</TableCell>
                 <TableCell>
                   <Dialog open={isDetailsDialogOpen && selectedApp?.id === app.id} onOpenChange={(open) => {
                     setIsDetailsDialogOpen(open);
@@ -206,16 +342,14 @@ function ApplicationsContent() {
                             <Label>一次面接日</Label>
                             <Input
                               type="datetime-local"
-                              value={app.first_interview_at?.slice(0, 16) || ''}
+                              value={formatDateTime(app.first_interview_at)}
                               onChange={async (e) => {
-                                try {
-                                  await updateApplication(app.id, {
-                                    first_interview_at: e.target.value ? new Date(e.target.value).toISOString() : null
-                                  });
-                                  loadApplications();
-                                } catch (error) {
-                                  console.error('Failed to update interview date:', error);
-                                }
+                                await handleInterviewDateChange(
+                                  app.id,
+                                  '一次',
+                                  e.target.value,
+                                  app.company_name
+                                );
                               }}
                             />
                           </div>
@@ -223,16 +357,14 @@ function ApplicationsContent() {
                             <Label>二次面接日</Label>
                             <Input
                               type="datetime-local"
-                              value={app.second_interview_at?.slice(0, 16) || ''}
+                              value={formatDateTime(app.second_interview_at)}
                               onChange={async (e) => {
-                                try {
-                                  await updateApplication(app.id, {
-                                    second_interview_at: e.target.value ? new Date(e.target.value).toISOString() : null
-                                  });
-                                  loadApplications();
-                                } catch (error) {
-                                  console.error('Failed to update interview date:', error);
-                                }
+                                await handleInterviewDateChange(
+                                  app.id,
+                                  '二次',
+                                  e.target.value,
+                                  app.company_name
+                                );
                               }}
                             />
                           </div>
@@ -242,16 +374,14 @@ function ApplicationsContent() {
                             <Label>最終面接日</Label>
                             <Input
                               type="datetime-local"
-                              value={app.final_interview_at?.slice(0, 16) || ''}
+                              value={formatDateTime(app.final_interview_at)}
                               onChange={async (e) => {
-                                try {
-                                  await updateApplication(app.id, {
-                                    final_interview_at: e.target.value ? new Date(e.target.value).toISOString() : null
-                                  });
-                                  loadApplications();
-                                } catch (error) {
-                                  console.error('Failed to update interview date:', error);
-                                }
+                                await handleInterviewDateChange(
+                                  app.id,
+                                  '最終',
+                                  e.target.value,
+                                  app.company_name
+                                );
                               }}
                             />
                           </div>
@@ -259,11 +389,11 @@ function ApplicationsContent() {
                             <Label>内定日</Label>
                             <Input
                               type="datetime-local"
-                              value={app.offer_received_at?.slice(0, 16) || ''}
+                              value={formatDateTime(app.offer_received_at)}
                               onChange={async (e) => {
                                 try {
                                   await updateApplication(app.id, {
-                                    offer_received_at: e.target.value ? new Date(e.target.value).toISOString() : null
+                                    offer_received_at: toUTCDateTime(e.target.value)
                                   });
                                   loadApplications();
                                 } catch (error) {
