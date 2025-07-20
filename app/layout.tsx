@@ -9,7 +9,7 @@ import { Toaster } from "@/components/ui/toaster"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "就職塾 - Job Hunting Support Service",
+  title: "向日offer - Job Hunting Support Service",
   description: "Comprehensive job hunting support platform for students and instructors",
     generator: 'v0.dev'
 }

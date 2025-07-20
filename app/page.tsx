@@ -12,7 +12,7 @@ export default function HomePage() {
           <div className="flex justify-between items-center py-6">
             <div className="flex items-center">
               <Briefcase className="h-8 w-8 text-blue-600 mr-2" />
-              <h1 className="text-2xl font-bold text-gray-900">就職塾</h1>
+              <h1 className="text-2xl font-bold text-gray-900">向日offer</h1>
             </div>
             <div className="flex space-x-4">
               <Link href="/login">
@@ -192,7 +192,7 @@ export default function HomePage() {
             <div>
               <div className="flex items-center mb-4">
                 <Briefcase className="h-6 w-6 mr-2" />
-                <span className="text-lg font-semibold">就職塾</span>
+                <span className="text-lg font-semibold">向日offer</span>
               </div>
               <p className="text-gray-400">学生の就職活動を成功に導く総合プラットフォーム</p>
             </div>
@@ -239,7 +239,7 @@ export default function HomePage() {
             <div>
               <h4 className="text-lg font-semibold mb-4">お問い合わせ</h4>
               <p className="text-gray-400">
-                Email: support@job-guidance.com
+                Email: xroffer@gmail.com
                 <br />
                 Tel: 03-1234-5678
                 <br />
@@ -248,7 +248,7 @@ export default function HomePage() {
             </div>
           </div>
           <div className="border-t border-gray-700 mt-8 pt-8 text-center text-gray-400">
-            <p>&copy; 2024 就職塾. All rights reserved.</p>
+            <p>&copy; 2024 向日offer. All rights reserved.</p>
           </div>
         </div>
       </footer>

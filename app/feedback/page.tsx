@@ -132,7 +132,7 @@ export default function FeedbackPage() {
                     <Mail className="h-5 w-5 text-blue-600" />
                     <div>
                       <div className="font-medium">メール</div>
-                      <div className="text-sm text-gray-600">support@job-guidance.com</div>
+                      <div className="text-sm text-gray-600">xroffer@gmail.com</div>
                     </div>
                   </div>
 

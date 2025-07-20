@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Calendar, BarChart3, User, MessageSquare, LogOut, Bell, Plus, Building, TrendingUp, UserCheck, Clock, Users, CheckCircle, AlertCircle, BookOpen } from "lucide-react"
+import { Calendar, BarChart3, User, MessageSquare, LogOut, Bell, Plus, Building, TrendingUp, UserCheck, Clock, Users, CheckCircle, AlertCircle, BookOpen, X } from "lucide-react"
 import { ProtectedRoute } from "@/components/protected-route"
 import { useAuth } from "@/components/auth-provider"
 import { supabase, type Interview, type Advertisement } from "@/lib/supabase"
@@ -45,6 +45,7 @@ export default function DashboardPage() {
     pending: 0,
   })
   const [upcomingInterviews, setUpcomingInterviews] = useState<Interview[]>([])
+  const [pastInterviews, setPastInterviews] = useState<Interview[]>([])
   const [advertisements, setAdvertisements] = useState<Advertisement[]>([])
   
   // 指导者用状态
@@ -94,18 +95,43 @@ export default function DashboardPage() {
         setStats(newStats)
       }
 
-      // Fetch upcoming interviews
+      // Fetch all interviews (upcoming and past)
       const { data: interviews } = await supabase
         .from("interviews")
         .select("*")
         .eq("user_id", user!.id)
-        .eq("status", "scheduled")
-        .gte("scheduled_date", new Date().toISOString().split("T")[0])
         .order("scheduled_date", { ascending: true })
-        .limit(5)
 
       if (interviews) {
-        setUpcomingInterviews(interviews)
+        // 获取当前东京时间的时间戳
+        const TOKYO_TIMEZONE = 'Asia/Tokyo'
+        const now = new Date()
+        
+        const upcoming = interviews.filter(interview => {
+          // 将面试的日期和时间合并，并假定为东京时间
+          const interviewDateTime = new Date(`${interview.scheduled_date}T${interview.scheduled_time}`)
+          
+          // 使用toLocaleString转换为东京时间进行比较
+          // 先获取当前东京时间的字符串表示
+          const nowTokyoString = now.toLocaleString('sv-SE', { timeZone: TOKYO_TIMEZONE })
+          const nowTokyoTime = new Date(nowTokyoString)
+          
+          // 假定面试时间就是东京时间，直接比较
+          return interviewDateTime >= nowTokyoTime
+        })
+        
+        const past = interviews.filter(interview => {
+          const interviewDateTime = new Date(`${interview.scheduled_date}T${interview.scheduled_time}`)
+          
+          const nowTokyoString = now.toLocaleString('sv-SE', { timeZone: TOKYO_TIMEZONE })
+          const nowTokyoTime = new Date(nowTokyoString)
+          
+          // 如果面试时间早于当前东京时间，则认为是过去的面试
+          return interviewDateTime < nowTokyoTime
+        })
+        
+        setUpcomingInterviews(upcoming.slice(0, 5))
+        setPastInterviews(past.slice(-3)) // 最近3个过去的面试
       }
 
       // Fetch advertisements
@@ -208,6 +234,35 @@ export default function DashboardPage() {
     }
   }
 
+  // 更新面试参加状态
+  const updateInterviewAttendance = async (interviewId: string, attended: boolean) => {
+    try {
+      const { error } = await supabase
+        .from("interviews")
+        .update({ 
+          status: attended ? "completed" : "cancelled"
+        })
+        .eq("id", interviewId)
+
+      if (error) throw error
+
+      // 重新获取数据
+      await fetchStudentDashboardData()
+      
+      toast({
+        title: "更新完了",
+        description: attended ? "面接参加を記録しました" : "面接欠席を記録しました",
+      })
+    } catch (error) {
+      console.error("Error updating interview attendance:", error)
+      toast({
+        title: "エラー",
+        description: "面接状態の更新に失敗しました",
+        variant: "destructive",
+      })
+    }
+  }
+
   const handleSignOut = async () => {
     try {
       await signOut()
@@ -242,7 +297,7 @@ export default function DashboardPage() {
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
               <div className="flex justify-between items-center py-4">
                 <Link href="/" className="flex items-center">
-                  <span className="text-xl font-bold text-blue-600">就職塾</span>
+                  <span className="text-xl font-bold text-blue-600">向日offer</span>
                 </Link>
                 <div className="flex items-center space-x-4">
                   <Button variant="ghost" size="sm">
@@ -468,7 +523,7 @@ export default function DashboardPage() {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between items-center py-4">
               <Link href="/" className="flex items-center">
-                <span className="text-xl font-bold text-blue-600">就職塾</span>
+                <span className="text-xl font-bold text-blue-600">向日offer</span>
               </Link>
               <div className="flex items-center space-x-4">
                 <Button variant="ghost" size="sm">
@@ -546,8 +601,9 @@ export default function DashboardPage() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Upcoming Interviews */}
-            <div className="lg:col-span-2">
+            {/* Interview Schedules */}
+            <div className="lg:col-span-2 space-y-6">
+              {/* Upcoming Interviews */}
               <Card>
                 <CardHeader>
                   <div className="flex items-center justify-between">
@@ -594,6 +650,109 @@ export default function DashboardPage() {
                   )}
                 </CardContent>
               </Card>
+
+              {/* Past Interviews */}
+              {pastInterviews.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center">
+                      <Clock className="h-5 w-5 mr-2 text-red-500" />
+                      過去の面接
+                    </CardTitle>
+                    <CardDescription>参加状況を確認してください</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      {pastInterviews.map((interview) => {
+                        const isPending = interview.status === 'scheduled'
+                        const isCompleted = interview.status === 'completed'
+                        const isCancelled = interview.status === 'cancelled'
+                        
+                        return (
+                          <div 
+                            key={interview.id} 
+                            className={`p-3 rounded-lg border-2 ${
+                              isPending ? 'border-red-200 bg-red-50' : 
+                              isCompleted ? 'border-green-200 bg-green-50' :
+                              isCancelled ? 'border-gray-200 bg-gray-50' :
+                              'border-gray-200 bg-gray-50'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center space-x-3">
+                                <Building className={`h-8 w-8 ${
+                                  isPending ? 'text-red-400' : 
+                                  isCompleted ? 'text-green-400' : 
+                                  'text-gray-400'
+                                }`} />
+                                <div>
+                                  <div className={`font-medium ${
+                                    isPending ? 'text-red-700' : 
+                                    isCompleted ? 'text-green-700' : 
+                                    'text-gray-700'
+                                  }`}>
+                                    {interview.company_name}
+                                  </div>
+                                  <div className={`text-sm ${
+                                    isPending ? 'text-red-600' : 
+                                    isCompleted ? 'text-green-600' : 
+                                    'text-gray-600'
+                                  }`}>
+                                    {interview.scheduled_date} {interview.scheduled_time}
+                                  </div>
+                                  <div className="flex items-center gap-2 mt-1">
+                                    <Badge variant="outline" className="text-xs">
+                                      {interview.interview_type}
+                                    </Badge>
+                                    {isPending && (
+                                      <Badge variant="destructive" className="text-xs">
+                                        確認待ち
+                                      </Badge>
+                                    )}
+                                    {isCompleted && (
+                                      <Badge variant="default" className="text-xs bg-green-600">
+                                        参加済み
+                                      </Badge>
+                                    )}
+                                    {isCancelled && (
+                                      <Badge variant="secondary" className="text-xs">
+                                        欠席
+                                      </Badge>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                              
+                              {isPending && (
+                                <div className="flex items-center space-x-2">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="bg-green-50 border-green-200 text-green-700 hover:bg-green-100"
+                                    onClick={() => updateInterviewAttendance(interview.id, true)}
+                                  >
+                                    <CheckCircle className="h-4 w-4 mr-1" />
+                                    参加した
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="bg-red-50 border-red-200 text-red-700 hover:bg-red-100"
+                                    onClick={() => updateInterviewAttendance(interview.id, false)}
+                                  >
+                                    <X className="h-4 w-4 mr-1" />
+                                    欠席した
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
             </div>
 
             {/* Quick Actions & Ads */}

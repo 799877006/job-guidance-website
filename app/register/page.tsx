@@ -99,7 +99,7 @@ export default function RegisterPage() {
         <CardHeader className="text-center">
           <div className="flex items-center justify-center mb-4">
             <Briefcase className="h-8 w-8 text-blue-600 mr-2" />
-            <span className="text-2xl font-bold">就職塾</span>
+            <span className="text-2xl font-bold">向日offer</span>
           </div>
           <CardTitle>新規登録</CardTitle>
           <CardDescription>アカウントを作成してください</CardDescription>
