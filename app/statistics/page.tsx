@@ -4,23 +4,41 @@ import { useState, useEffect } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { ArrowLeft, TrendingUp, Building, CheckCircle, XCircle, Clock } from "lucide-react"
+import { ArrowLeft, TrendingUp, Building, CheckCircle, XCircle, Clock, Users, BookOpen, Target } from "lucide-react"
 import { ProtectedRoute } from "@/components/protected-route"
 import { useAuth } from "@/components/auth-provider"
 import { supabase, type Application } from "@/lib/supabase"
 import { useToast } from "@/hooks/use-toast"
+import { getInstructorBookings } from "@/lib/mentoring"
 
 export default function StatisticsPage() {
-  const { user } = useAuth()
+  const { user, profile } = useAuth()
   const { toast } = useToast()
   const [applications, setApplications] = useState<Application[]>([])
+  const [instructorData, setInstructorData] = useState<{
+    bookings: any[],
+    guidedStudents: string[],
+    successRate: number,
+    totalGuidance: number,
+    monthlyGuidance: number
+  }>({
+    bookings: [],
+    guidedStudents: [],
+    successRate: 0,
+    totalGuidance: 0,
+    monthlyGuidance: 0
+  })
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (user) {
-      fetchApplications()
+    if (user && profile) {
+      if (profile.role === 'instructor') {
+        fetchInstructorStatistics()
+      } else {
+        fetchApplications()
+      }
     }
-  }, [user])
+  }, [user, profile])
 
   const fetchApplications = async () => {
     try {
@@ -43,6 +61,65 @@ export default function StatisticsPage() {
       toast({
         title: "エラー",
         description: "応募データの取得に失敗しました",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const fetchInstructorStatistics = async () => {
+    try {
+      // 获取所有预约
+      const allBookings = await getInstructorBookings(user!.id)
+      
+      if (allBookings) {
+        const currentMonth = new Date().getMonth()
+        const currentYear = new Date().getFullYear()
+        
+        // 计算完成的指导数
+        const completedGuidance = allBookings.filter(booking => 
+          booking.status === 'completed'
+        )
+        
+        // 计算月指导数
+        const monthlyGuidanceList = allBookings.filter(booking => {
+          const bookingDate = new Date(booking.date)
+          return bookingDate.getMonth() === currentMonth && 
+                 bookingDate.getFullYear() === currentYear &&
+                 booking.status === 'completed'
+        })
+
+        // 获取所有被指导过的学生ID
+        const guidedStudentIds = [...new Set(completedGuidance.map(booking => booking.student.id))]
+        
+        // 计算合格率
+        let successRate = 0
+        if (guidedStudentIds.length > 0) {
+          const { data: applications } = await supabase
+            .from("applications")
+            .select("status, user_id")
+            .in("user_id", guidedStudentIds)
+          
+          if (applications && applications.length > 0) {
+            const acceptedApplications = applications.filter(app => app.status === 'accepted')
+            successRate = Math.round((acceptedApplications.length / applications.length) * 100)
+          }
+        }
+
+        setInstructorData({
+          bookings: allBookings,
+          guidedStudents: guidedStudentIds,
+          successRate: successRate,
+          totalGuidance: completedGuidance.length,
+          monthlyGuidance: monthlyGuidanceList.length
+        })
+      }
+    } catch (error) {
+      console.error("Error fetching instructor statistics:", error)
+      toast({
+        title: "エラー",
+        description: "指導統計データの取得に失敗しました",
         variant: "destructive",
       })
     } finally {
@@ -113,14 +190,164 @@ export default function StatisticsPage() {
                   戻る
                 </Button>
               </Link>
-              <h1 className="text-xl font-bold">選考状況統計</h1>
+              <h1 className="text-xl font-bold">
+                {profile?.role === 'instructor' ? '指導統計' : '選考状況統計'}
+              </h1>
             </div>
           </div>
         </header>
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          {/* Overview Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          {profile?.role === 'instructor' ? (
+            <>
+              {/* 指导者统计 */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium text-gray-600">総指導数</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-3xl font-bold text-blue-600">{instructorData.totalGuidance}</div>
+                    <p className="text-sm text-gray-600 mt-1">回</p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium text-gray-600">月間指導数</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-3xl font-bold text-purple-600">{instructorData.monthlyGuidance}</div>
+                    <p className="text-sm text-gray-600 mt-1">今月の指導回数</p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium text-gray-600">合格率</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-3xl font-bold text-green-600">{instructorData.successRate}%</div>
+                    <p className="text-sm text-gray-600 mt-1">指導学生の合格率</p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium text-gray-600">指導学生数</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-3xl font-bold text-indigo-600">{instructorData.guidedStudents.length}</div>
+                    <p className="text-sm text-gray-600 mt-1">累計指導学生</p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                {/* 指导效果可视化 */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center">
+                      <Target className="h-5 w-5 mr-2" />
+                      指導効果
+                    </CardTitle>
+                    <CardDescription>指導した学生の成果</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {instructorData.totalGuidance > 0 ? (
+                      <div className="space-y-6">
+                        <div className="text-center">
+                          <div className="text-4xl font-bold text-green-600 mb-2">
+                            {instructorData.successRate}%
+                          </div>
+                          <p className="text-gray-600">合格率</p>
+                        </div>
+                        
+                        <div className="space-y-4">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm">総指導数</span>
+                            <span className="font-medium">{instructorData.totalGuidance}回</span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm">今月の指導</span>
+                            <span className="font-medium">{instructorData.monthlyGuidance}回</span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm">指導学生数</span>
+                            <span className="font-medium">{instructorData.guidedStudents.length}人</span>
+                          </div>
+                        </div>
+
+                        {instructorData.successRate > 0 && (
+                          <div className="mt-6 p-4 bg-green-50 rounded-lg">
+                            <div className="flex items-center">
+                              <CheckCircle className="h-5 w-5 text-green-600 mr-2" />
+                              <span className="text-green-800 font-medium">
+                                優秀な指導実績を達成しています
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="text-center py-12 text-gray-500">
+                        <BookOpen className="h-16 w-16 mx-auto mb-4 text-gray-300" />
+                        <p className="text-lg mb-2">まだ指導実績がありません</p>
+                        <p className="text-sm">学生の指導を開始すると統計が表示されます</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* 最近の指导记录 */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center">
+                      <Users className="h-5 w-5 mr-2" />
+                      最近の指導
+                    </CardTitle>
+                    <CardDescription>最新の指導セッション</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {instructorData.bookings.length > 0 ? (
+                      <div className="space-y-4 max-h-96 overflow-y-auto">
+                        {instructorData.bookings
+                          .filter(booking => booking.status === 'completed')
+                          .slice(0, 10)
+                          .map((booking: any) => (
+                          <div key={booking.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                            <div className="flex items-center space-x-3">
+                              <CheckCircle className="h-4 w-4 text-green-600" />
+                              <div>
+                                <div className="font-medium">{booking.student.full_name}</div>
+                                <div className="text-sm text-gray-600">
+                                  {booking.subject} • {booking.date}
+                                </div>
+                                {booking.student.university && (
+                                  <div className="text-xs text-gray-500">{booking.student.university}</div>
+                                )}
+                              </div>
+                            </div>
+                            <div className="text-sm font-medium text-green-600">完了</div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-12 text-gray-500">
+                        <Users className="h-16 w-16 mx-auto mb-4 text-gray-300" />
+                        <p className="text-lg mb-2">完了した指導がありません</p>
+                        <p className="text-sm">指導を完了すると履歴が表示されます</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            </>
+          ) : (
+            <>
+              {/* 学生统计（原有内容） */}
+              {/* Overview Stats */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-gray-600">応募総数</CardTitle>
@@ -290,6 +517,8 @@ export default function StatisticsPage() {
               </CardContent>
             </Card>
           </div>
+            </>
+          )}
         </div>
       </div>
     </ProtectedRoute>

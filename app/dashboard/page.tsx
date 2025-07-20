@@ -5,15 +5,39 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Calendar, BarChart3, User, MessageSquare, LogOut, Bell, Plus, Building, TrendingUp } from "lucide-react"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Calendar, BarChart3, User, MessageSquare, LogOut, Bell, Plus, Building, TrendingUp, UserCheck, Clock, Users, CheckCircle, AlertCircle, BookOpen } from "lucide-react"
 import { ProtectedRoute } from "@/components/protected-route"
 import { useAuth } from "@/components/auth-provider"
 import { supabase, type Interview, type Advertisement } from "@/lib/supabase"
 import { useToast } from "@/hooks/use-toast"
+import { getInstructorBookings, getPendingBookings } from "@/lib/mentoring"
+import { format, parseISO } from "date-fns"
+import { ja } from "date-fns/locale"
+
+interface Booking {
+  id: string
+  date: string
+  start_time: string
+  end_time: string
+  subject: string
+  description: string | null
+  student_notes: string | null
+  status: string
+  student: {
+    id: string
+    full_name: string
+    avatar_url: string | null
+    university: string | null
+    major: string | null
+  }
+}
 
 export default function DashboardPage() {
   const { user, profile, signOut } = useAuth()
   const { toast } = useToast()
+  
+  // 学生用状态
   const [stats, setStats] = useState({
     applied: 0,
     rejected: 0,
@@ -22,15 +46,41 @@ export default function DashboardPage() {
   })
   const [upcomingInterviews, setUpcomingInterviews] = useState<Interview[]>([])
   const [advertisements, setAdvertisements] = useState<Advertisement[]>([])
+  
+  // 指导者用状态
+  const [instructorStats, setInstructorStats] = useState({
+    totalGuidance: 0,         // 总辅导数
+    monthlyGuidance: 0,       // 月辅导数
+    successRate: 0,           // 合格率
+    pendingBookings: 0,       // 待机中的预约
+  })
+  const [todayBookings, setTodayBookings] = useState<Booking[]>([])
+  const [pendingBookings, setPendingBookings] = useState<Booking[]>([])
+  
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (user) {
-      fetchDashboardData()
+    if (user && profile) {
+      setLoading(true)
+      if (profile.role === 'instructor') {
+        fetchInstructorDashboardData()
+      } else {
+        fetchStudentDashboardData()
+      }
+    } else if (user === null && profile === null) {
+      // 如果用户和profile都为null，停止加载状态
+      setLoading(false)
     }
-  }, [user])
+  }, [user?.id, profile?.role])
 
-  const fetchDashboardData = async () => {
+  // 重置loading状态当组件卸载时
+  useEffect(() => {
+    return () => {
+      setLoading(false)
+    }
+  }, [])
+
+  const fetchStudentDashboardData = async () => {
     try {
       // Fetch application statistics
       const { data: applications } = await supabase.from("applications").select("status").eq("user_id", user!.id)
@@ -82,6 +132,83 @@ export default function DashboardPage() {
     }
   }
 
+  const fetchInstructorDashboardData = async () => {
+    try {
+      // 获取所有预约
+      const allBookings = await getInstructorBookings(user!.id)
+      const pending = await getPendingBookings(user!.id)
+      
+      if (allBookings) {
+        const today = new Date().toISOString().split('T')[0]
+        const currentMonth = new Date().getMonth()
+        const currentYear = new Date().getFullYear()
+        
+        // 计算今日预约
+        const todayBookingsList = allBookings.filter(booking => 
+          booking.date === today && booking.status === 'confirmed'
+        )
+        
+        // 计算完成的指导数（总数）
+        const completedGuidance = allBookings.filter(booking => 
+          booking.status === 'completed'
+        )
+        
+        // 计算月指导数
+        const monthlyGuidanceList = allBookings.filter(booking => {
+          const bookingDate = new Date(booking.date)
+          return bookingDate.getMonth() === currentMonth && 
+                 bookingDate.getFullYear() === currentYear &&
+                 booking.status === 'completed'
+        })
+
+        // 计算合格率（需要获取指导过的学生的应募成功率）
+        let successRate = 0
+        try {
+          // 获取所有被指导过的学生ID
+          const guidedStudentIds = [...new Set(completedGuidance.map(booking => booking.student.id))]
+          
+          if (guidedStudentIds.length > 0) {
+            // 获取这些学生的应募统计
+            const { data: applications } = await supabase
+              .from("applications")
+              .select("status, user_id")
+              .in("user_id", guidedStudentIds)
+            
+            if (applications && applications.length > 0) {
+              const acceptedApplications = applications.filter(app => app.status === 'accepted')
+              successRate = Math.round((acceptedApplications.length / applications.length) * 100)
+            }
+          }
+        } catch (error) {
+          console.error("Error calculating success rate:", error)
+          successRate = 0
+        }
+
+        setInstructorStats({
+          totalGuidance: completedGuidance.length,
+          monthlyGuidance: monthlyGuidanceList.length,
+          successRate: successRate,
+          pendingBookings: pending?.length || 0,
+        })
+        
+        setTodayBookings(todayBookingsList)
+      }
+      
+      if (pending) {
+        setPendingBookings(pending)
+      }
+    } catch (error) {
+      console.error("Error fetching instructor dashboard data:", error)
+      toast({
+        title: "エラー",
+        description: "データの取得に失敗しました",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const handleSignOut = async () => {
     try {
       await signOut()
@@ -106,6 +233,234 @@ export default function DashboardPage() {
     )
   }
 
+  // 指导者仪表板
+  if (profile?.role === 'instructor') {
+    return (
+      <ProtectedRoute>
+        <div className="min-h-screen bg-gray-50">
+          {/* Header */}
+          <header className="bg-white shadow-sm">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="flex justify-between items-center py-4">
+                <Link href="/" className="flex items-center">
+                  <span className="text-xl font-bold text-blue-600">就職塾</span>
+                </Link>
+                <div className="flex items-center space-x-4">
+                  <Button variant="ghost" size="sm">
+                    <Bell className="h-4 w-4" />
+                    {instructorStats.pendingBookings > 0 && (
+                      <Badge variant="destructive" className="ml-1 h-4 w-4 p-0 text-xs">
+                        {instructorStats.pendingBookings}
+                      </Badge>
+                    )}
+                  </Button>
+                  <Link href="/profile">
+                    <Button variant="ghost" size="sm">
+                      <User className="h-4 w-4 mr-2" />
+                      {profile?.full_name || "プロフィール"}
+                    </Button>
+                  </Link>
+                  <Button variant="ghost" size="sm" onClick={handleSignOut}>
+                    <LogOut className="h-4 w-4 mr-2" />
+                    ログアウト
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </header>
+
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div className="mb-8">
+              <h1 className="text-3xl font-bold text-gray-900">おかえりなさい、{profile?.full_name || "先生"}</h1>
+              <p className="text-gray-600 mt-2">今日の指導スケジュールを確認しましょう</p>
+            </div>
+
+            {/* 指导者统计卡片 */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-gray-600">総指導数</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-blue-600">{instructorStats.totalGuidance}</div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    <TrendingUp className="inline h-3 w-3 mr-1" />
+                    累計指導回数
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-gray-600">月間指導数</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-purple-600">{instructorStats.monthlyGuidance}</div>
+                  <p className="text-xs text-gray-500 mt-1">今月の指導回数</p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-gray-600">合格率</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-green-600">{instructorStats.successRate}%</div>
+                  <p className="text-xs text-gray-500 mt-1">指導学生の合格率</p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-gray-600">待機中</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-orange-600">{instructorStats.pendingBookings}</div>
+                  <p className="text-xs text-gray-500 mt-1">承認待ちの予約</p>
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              {/* 本日のスケジュール */}
+              <div className="lg:col-span-2">
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="flex items-center">
+                        <Calendar className="h-5 w-5 mr-2" />
+                        本日のスケジュール
+                      </CardTitle>
+                      <Link href="/instructor-dashboard">
+                        <Button size="sm">
+                          <Plus className="h-4 w-4 mr-2" />
+                          スケジュール管理
+                        </Button>
+                      </Link>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    {todayBookings.length > 0 ? (
+                      <div className="space-y-4">
+                        {todayBookings.map((booking) => (
+                          <div key={booking.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                            <div className="flex items-center space-x-3">
+                              <Avatar>
+                                <AvatarImage src={booking.student.avatar_url || undefined} />
+                                <AvatarFallback>
+                                  {booking.student.full_name?.charAt(0) || 'S'}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div>
+                                <div className="font-medium">{booking.student.full_name}</div>
+                                <div className="text-sm text-gray-600">
+                                  {booking.start_time.slice(0, 5)} - {booking.end_time.slice(0, 5)}
+                                </div>
+                                <div className="text-sm text-gray-500">{booking.subject}</div>
+                              </div>
+                            </div>
+                            <Badge variant="default">確定済み</Badge>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-8 text-gray-500">
+                        <Calendar className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                        <p>本日の予定はありません</p>
+                        <Link href="/instructor-dashboard">
+                          <Button variant="outline" className="mt-2">
+                            空き時間を設定する
+                          </Button>
+                        </Link>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* 待機中の予約とクイックアクション */}
+              <div className="space-y-6">
+                {/* 待機中の予約 */}
+                {pendingBookings.length > 0 && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center">
+                        <AlertCircle className="h-5 w-5 mr-2 text-orange-500" />
+                        承認待ちの予約
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
+                        {pendingBookings.slice(0, 3).map((booking) => (
+                          <div key={booking.id} className="p-3 border border-orange-200 rounded-lg">
+                            <div className="font-medium text-sm">{booking.student.full_name}</div>
+                            <div className="text-xs text-gray-600">
+                              {format(parseISO(booking.date), 'MM月dd日', { locale: ja })} {booking.start_time.slice(0, 5)}
+                            </div>
+                            <div className="text-xs text-gray-500 mt-1">{booking.subject}</div>
+                          </div>
+                        ))}
+                        {pendingBookings.length > 3 && (
+                          <div className="text-center">
+                            <Link href="/instructor-dashboard?tab=pending">
+                              <Button variant="ghost" size="sm">
+                                他 {pendingBookings.length - 3} 件を見る
+                              </Button>
+                            </Link>
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* クイックアクション */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>クイックアクション</CardTitle>
+                    <CardDescription>指導者向け機能へのショートカット</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 gap-3">
+                      <Link href="/instructor-dashboard">
+                        <Button variant="outline" className="w-full h-16 flex flex-col">
+                          <Calendar className="h-5 w-5 mb-1" />
+                          <span className="text-xs">スケジュール管理</span>
+                        </Button>
+                      </Link>
+
+                      <Link href="/instructor-dashboard?tab=bookings">
+                        <Button variant="outline" className="w-full h-16 flex flex-col">
+                          <Users className="h-5 w-5 mb-1" />
+                          <span className="text-xs">予約管理</span>
+                        </Button>
+                      </Link>
+
+                      <Link href="/profile">
+                        <Button variant="outline" className="w-full h-16 flex flex-col">
+                          <User className="h-5 w-5 mb-1" />
+                          <span className="text-xs">プロフィール</span>
+                        </Button>
+                      </Link>
+
+                      <Link href="/statistics">
+                        <Button variant="outline" className="w-full h-16 flex flex-col">
+                          <BarChart3 className="h-5 w-5 mb-1" />
+                          <span className="text-xs">統計</span>
+                        </Button>
+                      </Link>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          </div>
+        </div>
+      </ProtectedRoute>
+    )
+  }
+
+  // 学生仪表板（原有内容）
   return (
     <ProtectedRoute>
       <div className="min-h-screen bg-gray-50">
@@ -259,10 +614,10 @@ export default function DashboardPage() {
                       </Button>
                     </Link>
 
-                    <Link href="/statistics">
+                    <Link href="/mentoring">
                       <Button variant="outline" className="w-full h-16 flex flex-col bg-transparent">
-                        <BarChart3 className="h-5 w-5 mb-1" />
-                        <span className="text-xs">統計</span>
+                        <UserCheck className="h-5 w-5 mb-1" />
+                        <span className="text-xs">面接指导予約</span>
                       </Button>
                     </Link>
 

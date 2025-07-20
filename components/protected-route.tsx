@@ -19,8 +19,9 @@ export function ProtectedRoute({ children, requireAuth = true }: ProtectedRouteP
     if (!loading && requireAuth && !user) {
       router.push("/login")
     }
-  }, [user, loading, requireAuth, router])
+  }, [user?.id, loading, requireAuth, router])
 
+  // 显示加载状态
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -29,8 +30,15 @@ export function ProtectedRoute({ children, requireAuth = true }: ProtectedRouteP
     )
   }
 
+  // 需要认证但用户未登录
   if (requireAuth && !user) {
-    return null
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-gray-500">认证中，请稍候...</p>
+        </div>
+      </div>
+    )
   }
 
   return <>{children}</>

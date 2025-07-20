@@ -42,28 +42,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let mounted = true
 
+    // 检查页面是否可见，避免在后台时进行不必要的状态更新
+    const isPageVisible = () => !document.hidden
+
     // Get initial session
     const initializeAuth = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession()
         
-        if (mounted) {
-          setUser(session?.user ?? null)
-          
-          if (session?.user) {
-            // 只在非注册页面获取 profile
-            const currentPath = window.location.pathname
-            if (currentPath !== '/register') {
+        if (!mounted) return
+        
+        setUser(session?.user ?? null)
+        
+        if (session?.user) {
+          // 只在非注册页面获取 profile
+          const currentPath = window.location.pathname
+          if (currentPath !== '/register') {
+            try {
               const profileData = await getProfile(session.user.id)
-              setProfile(profileData)
+              if (mounted) {
+                setProfile(profileData)
+              }
+            } catch (error) {
+              console.error("获取 profile 失败:", error)
+              if (mounted) {
+                setProfile(null)
+              }
             }
           }
-          
+        } else {
+          setProfile(null)
+        }
+        
+        if (mounted) {
           setLoading(false)
         }
       } catch (error) {
         console.error("初始化认证状态失败:", error)
         if (mounted) {
+          setUser(null)
+          setProfile(null)
           setLoading(false)
         }
       }
@@ -71,10 +89,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     initializeAuth()
 
+    // 监听页面可见性变化
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && user) {
+        // 页面重新可见时，静默同步状态（不显示loading）
+        // 这里可以在将来添加必要的状态同步逻辑
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event: AuthChangeEvent, session) => {
       if (!mounted) return
 
+      // 对于TOKEN_REFRESHED事件，如果页面不可见，则不进行UI更新
+      if (event === 'TOKEN_REFRESHED' && !isPageVisible()) {
+        return
+      }
+
+      // 只在必要的事件时设置loading状态，避免在token刷新时显示加载界面
+      const shouldShowLoading = ['SIGNED_IN', 'SIGNED_OUT'].includes(event)
+      if (shouldShowLoading) {
+        setLoading(true)
+      }
+      
       setUser(session?.user ?? null)
       
       if (session?.user) {
@@ -87,11 +126,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             await createProfile(session.user.id);
             // 获取新创建的 profile
             const profileData = await getProfile(session.user.id);
-            setProfile(profileData);
+            if (mounted) {
+              setProfile(profileData);
+            }
           } catch (error) {
             console.error("创建 profile 失败:", error);
             // 清除暂存数据以防止重复尝试
             localStorage.removeItem('pendingProfile');
+            if (mounted) {
+              setProfile(null);
+            }
           }
         } else {
           // 只在特定的认证事件下获取 profile
@@ -100,9 +144,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (shouldFetchProfile) {
             try {
               const profileData = await getProfile(session.user.id)
-              setProfile(profileData)
+              if (mounted) {
+                setProfile(profileData)
+              }
             } catch (error) {
               console.error("获取 profile 失败:", error)
+              if (mounted) {
+                setProfile(null)
+              }
             }
           }
         }
@@ -110,12 +159,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setProfile(null)
       }
       
-      setLoading(false)
+      // 只在设置了loading的情况下才重置loading状态
+      if (mounted && shouldShowLoading) {
+        setLoading(false)
+      }
     })
 
     return () => {
       mounted = false
       subscription.unsubscribe()
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
   }, [])
 

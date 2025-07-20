@@ -223,6 +223,94 @@ export type Database = {
           created_at?: string
         }
       }
+      instructor_availability: {
+        Row: {
+          id: string
+          instructor_id: string
+          date: string
+          start_time: string
+          end_time: string
+          is_available: boolean
+          notes: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          instructor_id: string
+          date: string
+          start_time: string
+          end_time: string
+          is_available?: boolean
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          instructor_id?: string
+          date?: string
+          start_time?: string
+          end_time?: string
+          is_available?: boolean
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      mentoring_bookings: {
+        Row: {
+          id: string
+          student_id: string
+          instructor_id: string
+          availability_id: string
+          date: string
+          start_time: string
+          end_time: string
+          status: 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'rejected'
+          subject: string
+          description: string | null
+          student_notes: string | null
+          instructor_notes: string | null
+          meeting_url: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          student_id: string
+          instructor_id: string
+          availability_id: string
+          date: string
+          start_time: string
+          end_time: string
+          status?: 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'rejected'
+          subject: string
+          description?: string | null
+          student_notes?: string | null
+          instructor_notes?: string | null
+          meeting_url?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          student_id?: string
+          instructor_id?: string
+          availability_id?: string
+          date?: string
+          start_time?: string
+          end_time?: string
+          status?: 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'rejected'
+          subject?: string
+          description?: string | null
+          student_notes?: string | null
+          instructor_notes?: string | null
+          meeting_url?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
     }
     Views: {
       [_ in never]: never
