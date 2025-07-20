@@ -2,22 +2,36 @@ import { supabase } from './supabase';
 import type { Message, UserMessage, MessageWithStatus } from './types/message';
 
 export async function getUserMessages(userId: string): Promise<MessageWithStatus[]> {
+  // 调试：检查认证状态
+  const { data: { session } } = await supabase.auth.getSession();
+  console.log('Current session:', session);
+  console.log('Current user:', session?.user);
+
+  // 首先尝试获取用户消息状态
+  const { data: userMessages, error: userMessagesError } = await supabase
+    .from('user_messages')
+    .select('*')
+    .eq('user_id', userId);
+
+  if (userMessagesError) {
+    console.error('Error fetching user_messages:', userMessagesError);
+    throw userMessagesError;
+  }
+
+  // 然后尝试获取消息内容
   const { data, error } = await supabase
     .from('user_messages')
     .select(`
       *,
-      message:messages(
-        *,
-        sender:sender_id(
-          full_name,
-          avatar_url
-        )
-      )
+      message:messages(*)
     `)
     .eq('user_id', userId)
     .order('created_at', { ascending: false });
 
-  if (error) throw error;
+  if (error) {
+    console.error('Error fetching messages with content:', error);
+    throw error;
+  }
 
   return data.map((userMessage: UserMessage) => ({
     ...userMessage.message!,
@@ -29,11 +43,15 @@ export async function getUserMessages(userId: string): Promise<MessageWithStatus
 export async function getUnreadMessageCount(userId: string): Promise<number> {
   const { count, error } = await supabase
     .from('user_messages')
-    .select('*', { count: 'exact' })
+    .select('*', { count: 'exact', head: true })
     .eq('user_id', userId)
     .eq('is_read', false);
 
-  if (error) throw error;
+  if (error) {
+    console.error('Error fetching unread count:', error);
+    throw error;
+  }
+
   return count || 0;
 }
 
@@ -47,7 +65,10 @@ export async function markMessageAsRead(userId: string, messageId: string) {
     .eq('user_id', userId)
     .eq('message_id', messageId);
 
-  if (error) throw error;
+  if (error) {
+    console.error('Error marking message as read:', error);
+    throw error;
+  }
 }
 
 export async function markAllMessagesAsRead(userId: string) {
@@ -60,7 +81,10 @@ export async function markAllMessagesAsRead(userId: string) {
     .eq('user_id', userId)
     .eq('is_read', false);
 
-  if (error) throw error;
+  if (error) {
+    console.error('Error marking all messages as read:', error);
+    throw error;
+  }
 }
 
 export function getMessageTypeConfig(type: Message['message_type']) {

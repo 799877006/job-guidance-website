@@ -5,14 +5,9 @@ export interface Message {
   title: string;
   content: string;
   message_type: MessageType;
-  sender_id: string | null;
   created_at: string;
   updated_at: string;
   is_global: boolean;
-  sender?: {
-    full_name: string;
-    avatar_url: string | null;
-  };
 }
 
 export interface UserMessage {

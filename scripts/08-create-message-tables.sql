@@ -11,7 +11,6 @@ CREATE TABLE messages (
   title TEXT NOT NULL,
   content TEXT NOT NULL,
   message_type message_type NOT NULL DEFAULT 'notification',
-  sender_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
   created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
   is_global BOOLEAN NOT NULL DEFAULT false -- 是否全局消息
@@ -46,7 +45,7 @@ ALTER TABLE user_messages ENABLE ROW LEVEL SECURITY;
 
 -- Messages表的RLS策略
 CREATE POLICY "Admins can manage all messages"
-ON messages
+ON messages FOR ALL
 USING (
   EXISTS (
     SELECT 1 FROM auth.users

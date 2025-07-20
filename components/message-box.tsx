@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -19,15 +19,9 @@ export function MessageBox() {
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
 
-  useEffect(() => {
-    if (user) {
-      loadMessages();
-      loadUnreadCount();
-    }
-  }, [user]);
-
-  const loadMessages = async () => {
-    if (!user) return;
+  // 使用useCallback缓存函数
+  const loadMessages = useCallback(async () => {
+    if (!user?.id) return;
     setLoading(true);
     try {
       const data = await getUserMessages(user.id);
@@ -37,20 +31,35 @@ export function MessageBox() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.id]);
 
-  const loadUnreadCount = async () => {
-    if (!user) return;
+  const loadUnreadCount = useCallback(async () => {
+    if (!user?.id) return;
     try {
       const count = await getUnreadMessageCount(user.id);
       setUnreadCount(count);
     } catch (error) {
       console.error('Failed to load unread count:', error);
     }
-  };
+  }, [user?.id]);
+
+  // 只在组件挂载和user变化时加载数据
+  useEffect(() => {
+    if (user?.id) {
+      loadMessages();
+      loadUnreadCount();
+    }
+  }, [user?.id, loadMessages, loadUnreadCount]);
+
+  // 打开弹窗时重新加载消息
+  useEffect(() => {
+    if (open && user?.id) {
+      loadMessages();
+    }
+  }, [open, user?.id, loadMessages]);
 
   const handleMarkAsRead = async (messageId: string) => {
-    if (!user) return;
+    if (!user?.id) return;
     try {
       await markMessageAsRead(user.id, messageId);
       setMessages(messages.map(msg => 
@@ -63,7 +72,7 @@ export function MessageBox() {
   };
 
   const handleMarkAllAsRead = async () => {
-    if (!user) return;
+    if (!user?.id) return;
     try {
       await markAllMessagesAsRead(user.id);
       setMessages(messages.map(msg => ({ ...msg, is_read: true, read_at: new Date().toISOString() })));
@@ -128,13 +137,8 @@ export function MessageBox() {
                         <p className="text-sm text-gray-600 whitespace-pre-wrap">
                           {message.content}
                         </p>
-                        <div className="flex items-center gap-2 text-xs text-gray-500">
-                          <span>
-                            {format(new Date(message.created_at), 'MM/dd HH:mm', { locale: ja })}
-                          </span>
-                          {message.sender && (
-                            <span>from {message.sender.full_name}</span>
-                          )}
+                        <div className="text-xs text-gray-500">
+                          {format(new Date(message.created_at), 'MM/dd HH:mm', { locale: ja })}
                         </div>
                       </div>
                       {!message.is_read && (

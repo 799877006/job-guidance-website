@@ -1,69 +1,56 @@
 // Dashboard页面使用的类型定义
 
-// 统计信息
+export interface JobAdvertisement {
+  id: string;
+  title: string;
+  company_name: string;
+  description?: string;
+  image_url?: string;
+  link_url: string;
+  source: string;
+  is_active: boolean;
+  salary_range?: string;
+  location?: string;
+  employment_type?: string;
+  requirements?: string;
+  benefits?: string[];
+  posted_at: string;
+  created_at: string;
+}
+
 export interface DashboardStats {
-  applied: number
-  rejected: number
-  accepted: number
-  pending: number
+  total: number;
+  rejected: number;
+  accepted: number;
+  pending: number;
 }
 
-// 指导老师信息
-export interface Instructor {
-  id: string
-  full_name: string
-  avatar_url: string | null
+export interface UpcomingEvent {
+  id: string;
+  type: 'interview' | 'mentoring';
+  date: string;
+  time: string;
+  title: string;
+  status: string;
+  instructor?: {
+    id: string;
+    full_name: string;
+    avatar_url: string | null;
+  };
 }
 
-// 预约事件基础类型
-interface BaseEvent {
-  id: string
-  date: string
-  time: string
-  title: string
-  status: string
-}
-
-// 面试预约事件
-export interface InterviewEvent extends BaseEvent {
-  type: 'interview'
-}
-
-// 指导预约事件
-export interface MentoringEvent extends BaseEvent {
-  type: 'mentoring'
-  instructor: Instructor
-}
-
-// 预约事件联合类型
-export type UpcomingEvent = InterviewEvent | MentoringEvent
-
-// 判断事件类型的类型守卫
-export function isMentoringEvent(event: UpcomingEvent): event is MentoringEvent {
-  return event.type === 'mentoring'
-}
-
-export function isInterviewEvent(event: UpcomingEvent): event is InterviewEvent {
-  return event.type === 'interview'
-}
-
-// 状态配置类型
-interface StatusConfig {
-  label: string
-  variant: 'default' | 'secondary' | 'outline'
-  className?: string
-}
-
-// 获取事件状态显示配置
-export function getEventStatusConfig(event: UpcomingEvent): StatusConfig {
-  const statusConfigs: Record<string, StatusConfig> = {
-    scheduled: { label: '確定', variant: 'default' },
-    confirmed: { label: '確定', variant: 'default' },
-    pending: { label: '確認待ち', variant: 'secondary', className: 'bg-yellow-100 text-yellow-800' },
-    completed: { label: '完了', variant: 'outline' },
-    cancelled: { label: 'キャンセル', variant: 'outline' }
+export function getEventStatusConfig(event: UpcomingEvent) {
+  if (event.type === 'interview') {
+    return {
+      variant: 'default',
+      className: '',
+      label: '面接'
+    };
+  } else {
+    return {
+      variant: event.status === 'pending' ? 'secondary' : 'default',
+      className: '',
+      label: event.status === 'pending' ? '承認待ち' : '確定'
+    };
   }
-
-  const status = event.status.toLowerCase()
-  return statusConfigs[status] || { label: event.status, variant: 'outline' }
 } 
