@@ -24,6 +24,7 @@ import {
 import { ProtectedRoute } from "@/components/protected-route";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { MessageBox } from '@/components/message-box';
 
 interface DashboardStats {
   total: number;
@@ -149,9 +150,7 @@ export default function DashboardPage() {
                 <span className="text-xl font-bold text-blue-600">向日offer</span>
               </Link>
               <div className="flex items-center space-x-4">
-                <Button variant="ghost" size="sm">
-                  <Bell className="h-4 w-4" />
-                </Button>
+                <MessageBox />
                 <Link href="/profile">
                   <Button variant="ghost" size="sm">
                     <User className="h-4 w-4 mr-2" />
