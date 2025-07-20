@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Card } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -15,7 +15,8 @@ import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
 
-export default function ApplicationsPage() {
+// 主要内容组件
+function ApplicationsContent() {
   const { toast } = useToast();
   const searchParams = useSearchParams();
   const statusFilter = searchParams.get('status');
@@ -360,5 +361,26 @@ export default function ApplicationsPage() {
         </Table>
       </Card>
     </div>
+  );
+}
+
+// 加载状态组件
+function LoadingState() {
+  return (
+    <div className="container mx-auto py-8">
+      <div className="animate-pulse space-y-4">
+        <div className="h-8 bg-gray-200 rounded w-1/4"></div>
+        <div className="h-[400px] bg-gray-200 rounded"></div>
+      </div>
+    </div>
+  );
+}
+
+// 主页面组件
+export default function ApplicationsPage() {
+  return (
+    <Suspense fallback={<LoadingState />}>
+      <ApplicationsContent />
+    </Suspense>
   );
 } 
