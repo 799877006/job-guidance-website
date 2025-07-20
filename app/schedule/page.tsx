@@ -1,7 +1,8 @@
 "use client"
 
-import React, { useState, useEffect } from "react"
+import React, { Suspense, useState, useEffect } from "react"
 import Link from "next/link"
+import { useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -28,9 +29,24 @@ import { supabase, type Interview } from "@/lib/supabase"
 import { format, addDays, startOfWeek, endOfWeek, isSameDay, parseISO } from "date-fns"
 import { ja } from "date-fns/locale"
 
-export default function StudentSchedulePage() {
+// 加载状态组件
+function LoadingState() {
+  return (
+    <div className="container mx-auto p-6">
+      <div className="animate-pulse space-y-4">
+        <div className="h-8 bg-gray-200 rounded w-1/3"></div>
+        <div className="h-4 bg-gray-200 rounded w-1/4"></div>
+        <div className="h-[600px] bg-gray-200 rounded"></div>
+      </div>
+    </div>
+  );
+}
+
+// 主要内容组件
+function StudentScheduleContent() {
   const { user, profile } = useAuth()
   const { toast } = useToast()
+  const searchParams = useSearchParams()
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [activeTab, setActiveTab] = useState("schedule")
   const [mySchedule, setMySchedule] = useState<StudentSchedule[]>([])
@@ -701,4 +717,13 @@ export default function StudentSchedulePage() {
       </div>
     </ProtectedRoute>
   )
+}
+
+// 主页面组件
+export default function StudentSchedulePage() {
+  return (
+    <Suspense fallback={<LoadingState />}>
+      <StudentScheduleContent />
+    </Suspense>
+  );
 }
