@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -13,13 +13,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ArrowLeft, Send, MessageSquare, Mail, Phone } from "lucide-react"
 import { ProtectedRoute } from "@/components/protected-route"
 import { useAuth } from "@/components/auth-provider"
-import { supabase } from "@/lib/supabase"
 import { useToast } from "@/hooks/use-toast"
 
 export default function FeedbackPage() {
   const { user, profile } = useAuth()
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
+  const [isInitialized, setIsInitialized] = useState(false)
   const [feedback, setFeedback] = useState({
     name: "",
     email: "",
@@ -28,15 +28,17 @@ export default function FeedbackPage() {
     message: "",
   })
 
-  useState(() => {
-    if (profile) {
+  // 初始化表单数据，仅在profile首次加载时设置
+  useEffect(() => {
+    if (profile && !isInitialized) {
       setFeedback((prev) => ({
         ...prev,
         name: profile.full_name || "",
         email: profile.email || "",
       }))
+      setIsInitialized(true)
     }
-  })
+  }, [profile, isInitialized])
 
   const handleInputChange = (field: string, value: string) => {
     setFeedback((prev) => ({ ...prev, [field]: value }))
@@ -47,28 +49,35 @@ export default function FeedbackPage() {
     setLoading(true)
 
     try {
-      // Save feedback to database
-      const { error } = await supabase.from("feedback").insert([
-        {
-          user_id: user!.id,
+      // 调用API发送feedback（包含数据库保存和邮件发送）
+      const response = await fetch('/api/send-feedback', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: user?.id,
           name: feedback.name,
           email: feedback.email,
           category: feedback.category,
           subject: feedback.subject,
           message: feedback.message,
-        },
-      ])
-
-      if (error) throw error
-
-      // Here you would typically send an email notification
-      // For now, we'll just show a success message
-      toast({
-        title: "送信完了",
-        description: "フィードバックを送信しました。お返事をお待ちください。",
+        }),
       })
 
-      // Reset form
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.error || 'フィードバックの送信に失敗しました')
+      }
+
+      // 显示成功消息
+      toast({
+        title: "送信完了",
+        description: result.message || "フィードバックを送信しました。お返事をお待ちください。",
+      })
+
+      // 重置表单
       setFeedback({
         name: profile?.full_name || "",
         email: profile?.email || "",
@@ -76,11 +85,12 @@ export default function FeedbackPage() {
         subject: "",
         message: "",
       })
+      // 不需要重置isInitialized，保持用户信息预填充
     } catch (error) {
-      console.error("Error submitting feedback:", error)
+      console.error("フィードバック送信エラー:", error)
       toast({
         title: "エラー",
-        description: "フィードバックの送信に失敗しました",
+        description: error instanceof Error ? error.message : "フィードバックの送信に失敗しました",
         variant: "destructive",
       })
     } finally {

@@ -61,7 +61,6 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (user && profile) {
-      setLoading(true)
       if (profile.role === 'instructor') {
         fetchInstructorDashboardData()
       } else {

@@ -42,9 +42,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let mounted = true
 
-    // 检查页面是否可见，避免在后台时进行不必要的状态更新
-    const isPageVisible = () => !document.hidden
-
     // Get initial session
     const initializeAuth = async () => {
       try {
@@ -89,27 +86,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     initializeAuth()
 
-    // 监听页面可见性变化
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && user) {
-        // 页面重新可见时，静默同步状态（不显示loading）
-        // 这里可以在将来添加必要的状态同步逻辑
-      }
-    }
-
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event: AuthChangeEvent, session) => {
       if (!mounted) return
 
-      // 对于TOKEN_REFRESHED事件，如果页面不可见，则不进行UI更新
-      if (event === 'TOKEN_REFRESHED' && !isPageVisible()) {
+      // 对于TOKEN_REFRESHED事件，静默处理，不显示加载界面
+      if (event === 'TOKEN_REFRESHED') {
+        // 静默更新用户状态，不影响UI
+        setUser(session?.user ?? null)
         return
       }
 
-      // 只在必要的事件时设置loading状态，避免在token刷新时显示加载界面
-      const shouldShowLoading = ['SIGNED_IN', 'SIGNED_OUT'].includes(event)
+      // 只在用户主动登录/登出时显示加载状态
+      const shouldShowLoading = event === 'SIGNED_OUT'
       if (shouldShowLoading) {
         setLoading(true)
       }
@@ -138,10 +127,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
           }
         } else {
-          // 只在特定的认证事件下获取 profile
-          const shouldFetchProfile = ['SIGNED_IN', 'TOKEN_REFRESHED', 'USER_UPDATED'].includes(event);
-          
-          if (shouldFetchProfile) {
+          // 只在用户登录时获取 profile，避免token刷新时的重复请求
+          if (event === 'SIGNED_IN') {
             try {
               const profileData = await getProfile(session.user.id)
               if (mounted) {
@@ -159,7 +146,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setProfile(null)
       }
       
-      // 只在设置了loading的情况下才重置loading状态
+      // 只在显示了loading的情况下才重置loading状态
       if (mounted && shouldShowLoading) {
         setLoading(false)
       }
@@ -168,7 +155,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       mounted = false
       subscription.unsubscribe()
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
   }, [])
 

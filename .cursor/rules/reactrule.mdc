@@ -1,0 +1,205 @@
+---
+description: React + Next.js + Supabase 就職支援ウェブサイト開発ルール - pnpm使用、日本語UI、中国語コメント
+globs: ["**/*.{ts,tsx,js,jsx,json,css,md}"]
+alwaysApply: true
+---
+
+# Development Rules for Job Guidance Website
+
+## Project Overview
+
+This is a job guidance website built with React, Next.js, and Supabase. The project helps students manage their job hunting activities with features like interview scheduling, application tracking, and mentoring.
+
+## Technology Stack
+
+- **Frontend**: React 18+ with Next.js 15+
+- **Database**: Supabase (PostgreSQL with real-time features)
+- **Package Manager**: pnpm (strictly use pnpm, never npm or yarn)
+- **Styling**: Tailwind CSS with custom design system
+- **UI Components**: Radix UI primitives (free, accessible components)
+- **State Management**: React hooks and context API
+- **Authentication**: Supabase Auth
+- **TypeScript**: Strict mode enabled
+- **Form Handling**: React Hook Form with Zod validation
+
+## Language Requirements
+
+- **User Interface**: All user-facing text must be in Japanese (日本語)
+- **Code Comments**: All comments must be in Chinese (中文)
+- **Variable/Function Names**: Use English with descriptive names
+- **File Names**: Use kebab-case for components and pages
+
+## Code Standards
+
+### Package Management
+
+- Always use `pnpm` for package management
+- Never use npm or yarn commands
+- Use `pnpm add` for dependencies, `pnpm add -D` for dev dependencies
+- Keep dependencies minimal and avoid paid/premium packages
+
+### React/Next.js Guidelines
+
+- Use functional components with hooks exclusively
+- Implement App Router (not Pages Router)
+- Use server components by default, client components only when necessary
+- Follow Next.js 15+ conventions for routing and data fetching
+- Use TypeScript for all components with proper type definitions
+
+### Database & API
+
+- Use Supabase client for all database operations
+- Implement Row Level Security (RLS) policies
+- Use real-time subscriptions for live updates when appropriate
+- Handle authentication with Supabase Auth
+- Create type-safe database schemas with generated TypeScript types
+
+### UI/UX Guidelines
+
+- All user-facing text must be in Japanese
+- Use Radix UI components as base, styled with Tailwind CSS
+- Implement responsive design for mobile-first approach
+- Ensure accessibility compliance (ARIA labels in Japanese)
+- Use consistent spacing and typography from design system
+- Implement dark/light mode support
+
+### Code Organization
+
+```
+app/                    // Next.js App Router pages
+components/            // Reusable UI components
+  ui/                 // Base UI components (Radix + Tailwind)
+lib/                  // Utility functions and configurations
+  types/             // TypeScript type definitions
+hooks/                // Custom React hooks
+scripts/              // Database migration scripts
+```
+
+### Component Structure
+
+```typescript
+// コンポーネントの基本構造
+interface ComponentProps {
+  // プロパティの型定義（中文注释）
+}
+
+export function Component({ prop }: ComponentProps) {
+  // ステートとエフェクトの定義（中文注释）
+  
+  return (
+    // JSX with Japanese text for UI
+  )
+}
+```
+
+### Database Schema
+
+- Use descriptive table names in English
+- Implement proper foreign key relationships
+- Add indexes for performance optimization
+- Use Supabase's built-in UUID for primary keys
+- Implement soft deletes where appropriate
+
+### Error Handling
+
+- Use try-catch blocks for async operations
+- Implement proper error boundaries for React components
+- Show user-friendly error messages in Japanese
+- Log errors for debugging purposes
+- Handle loading and error states gracefully
+
+### Authentication & Authorization
+
+- Use Supabase Auth for user management
+- Implement protected routes with proper redirects
+- Handle different user roles (student, instructor, admin)
+- Secure API routes with proper middleware
+- Store user preferences and session data securely
+
+### Performance Optimization
+
+- Use Next.js Image component for optimized images
+- Implement proper SEO with metadata API
+- Use dynamic imports for code splitting
+- Optimize bundle size by avoiding large dependencies
+- Implement proper caching strategies
+
+### Testing Guidelines
+
+- Write unit tests for utility functions
+- Test React components with React Testing Library
+- Use Japanese text in test assertions where appropriate
+- Mock Supabase client for testing
+- Test accessibility features
+
+### Git Workflow
+
+- Use descriptive commit messages in English
+- Create feature branches for new functionality
+- Use conventional commit format
+- Keep commits atomic and focused
+- Review code before merging
+
+## File Naming Conventions
+
+- Components: `PascalCase.tsx` (e.g., `UserProfile.tsx`)
+- Pages: `kebab-case.tsx` (e.g., `user-dashboard.tsx`)
+- Utilities: `camelCase.ts` (e.g., `formatDate.ts`)
+- Constants: `SCREAMING_SNAKE_CASE.ts`
+
+## Japanese UI Text Examples
+
+```typescript
+// ボタンテキスト
+"ログイン" // Login
+"新規登録" // Register
+"保存" // Save
+"キャンセル" // Cancel
+"削除" // Delete
+"編集" // Edit
+
+// ナビゲーション
+"ダッシュボード" // Dashboard
+"プロフィール" // Profile
+"スケジュール" // Schedule
+"統計" // Statistics
+"設定" // Settings
+
+// フォームラベル
+"メールアドレス" // Email Address
+"パスワード" // Password
+"氏名" // Full Name
+"電話番号" // Phone Number
+```
+
+## Restrictions
+
+- No paid libraries or services
+- No external paid APIs
+- Use only free tier of Supabase
+- Avoid premium UI component libraries
+- Use free fonts and icons only
+
+## Development Commands
+
+```zsh
+# 開発サーバー起動
+pnpm dev
+
+# ビルド
+pnpm build
+
+# 型チェック
+pnpm type-check
+
+# リンター実行
+pnpm lint
+
+# 依存関係追加
+pnpm add [package-name]
+
+# 開発依存関係追加
+pnpm add -D [package-name]
+```
+
+Remember: Always write comments in Chinese, UI text in Japanese, and use pnpm for package management. Focus on creating a professional, accessible, and user-friendly job guidance platform.
