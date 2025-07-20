@@ -1,4 +1,4 @@
-export type ApplicationStatus =
+export type ApplicationStatus = 
   | '書類選考中'
   | '一次面接待ち'
   | '一次面接完了'
@@ -8,6 +8,8 @@ export type ApplicationStatus =
   | '最終面接完了'
   | '内定'
   | '不合格';
+
+export type InterviewStatus = 'scheduled' | 'completed' | 'cancelled';
 
 export interface Application {
   id: string;
@@ -22,21 +24,21 @@ export interface Application {
   offer_received_at: string | null;
   created_at: string;
   updated_at: string;
-}
-
-export interface ApplicationDetails {
-  id: string;
-  application_id: string;
-  annual_salary: number | null;
-  monthly_salary: number | null;
-  benefits: string[];
-  location: string | null;
-  work_hours: string | null;
-  other_conditions: string | null;
-  created_at: string;
-  updated_at: string;
+  // 新增面试相关字段
+  interview_location?: string | null;
+  interview_notes?: string | null;
+  interview_status?: InterviewStatus;
 }
 
 export interface ApplicationWithDetails extends Application {
-  details?: ApplicationDetails;
+  details?: {
+    id: string;
+    application_id: string;
+    annual_salary: number | null;
+    monthly_salary: number | null;
+    benefits: string[];
+    location: string | null;
+    work_hours: string | null;
+    other_conditions: string | null;
+  } | null;
 } 

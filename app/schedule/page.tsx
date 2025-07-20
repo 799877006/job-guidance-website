@@ -81,16 +81,6 @@ function StudentScheduleContent() {
       // 获取所有日程（包括面试日程）
       const schedule = await getStudentSchedule(user.id, startDate, endDate)
       
-      // 获取面试信息
-      const { data: interviewData } = await supabase
-        .from("interviews")
-        .select("*")
-        .eq("user_id", user.id)
-        .gte("scheduled_date", startDate)
-        .lte("scheduled_date", endDate)
-        .order("scheduled_date", { ascending: true })
-        console.log('Found interviews:', interviewData); // 添加调试日志
-
       // 获取应聘记录中的面试日程
       const { data: applications } = await supabase
         .from("applications")
@@ -102,39 +92,23 @@ function StudentScheduleContent() {
           final_interview_at,
           created_at,
           updated_at,
-          user_id
+          user_id,
+          status,
+          interview_location,
+          interview_notes,
+          interview_status
         `)
         .eq("user_id", user.id)
-        .neq("status", "不合格")
         .or(
           `and(first_interview_at.gte.${startDate},first_interview_at.lte.${endDate}),` +
           `and(second_interview_at.gte.${startDate},second_interview_at.lte.${endDate}),` +
           `and(final_interview_at.gte.${startDate},final_interview_at.lte.${endDate})`
         )
+
       console.log('Found applications:', applications); // 添加调试日志
 
       // 合并所有日程
       let allSchedules = [...(schedule || [])]
-
-      // 添加面试预约的日程
-      if (interviewData) {
-        interviewData.forEach(interview => {
-          allSchedules.push({
-            id: interview.id,
-            student_id: user.id,
-            date: interview.scheduled_date,
-            start_time: interview.scheduled_time.slice(0, 5),
-            end_time: format(new Date(new Date(`${interview.scheduled_date}T${interview.scheduled_time}`).getTime() + 60 * 60 * 1000), 'HH:mm'),
-            schedule_type: 'interview',
-            title: `${interview.company_name} - ${interview.interview_type}`,
-            description: `${interview.company_name}の${interview.interview_type}`,
-            color: '#3b82f6',
-            created_at: interview.created_at,
-            updated_at: interview.updated_at,
-            location: ''
-          })
-        })
-      }
 
       // 添加应聘记录中的面试日程
       if (applications) {
@@ -151,10 +125,11 @@ function StudentScheduleContent() {
                 end_time: format(new Date(date.getTime() + 60 * 60 * 1000), 'HH:mm'),
                 schedule_type: 'interview',
                 title: `${app.company_name} - 一次面接`,
-                description: `${app.company_name}の一次面接`,
+                description: app.interview_notes || `${app.company_name}の一次面接`,
                 color: '#3b82f6',
                 created_at: app.created_at,
-                updated_at: app.updated_at
+                updated_at: app.updated_at,
+                location: app.interview_location || ''
               })
             }
           }
@@ -171,10 +146,11 @@ function StudentScheduleContent() {
                 end_time: format(new Date(date.getTime() + 60 * 60 * 1000), 'HH:mm'),
                 schedule_type: 'interview',
                 title: `${app.company_name} - 二次面接`,
-                description: `${app.company_name}の二次面接`,
+                description: app.interview_notes || `${app.company_name}の二次面接`,
                 color: '#3b82f6',
                 created_at: app.created_at,
-                updated_at: app.updated_at
+                updated_at: app.updated_at,
+                location: app.interview_location || ''
               })
             }
           }
@@ -191,10 +167,11 @@ function StudentScheduleContent() {
                 end_time: format(new Date(date.getTime() + 60 * 60 * 1000), 'HH:mm'),
                 schedule_type: 'interview',
                 title: `${app.company_name} - 最終面接`,
-                description: `${app.company_name}の最終面接`,
+                description: app.interview_notes || `${app.company_name}の最終面接`,
                 color: '#3b82f6',
                 created_at: app.created_at,
-                updated_at: app.updated_at
+                updated_at: app.updated_at,
+                location: app.interview_location || ''
               })
             }
           }
@@ -205,7 +182,7 @@ function StudentScheduleContent() {
 
       // 更新状态
       setMySchedule(allSchedules)
-      setInterviews(interviewData || [])
+      setInterviews([]) // 不再需要单独的面试数据
     } catch (error) {
       console.error('Error loading data:', error)
       toast({
@@ -290,29 +267,37 @@ function StudentScheduleContent() {
 
     setLoading(true)
     try {
-      // 检查是否是面试预约的日程
-      const isInterviewSchedule = interviews.find(i => i.id === editingSchedule.id);
+      // 检查是否是面试日程（ID格式：first_xxx, second_xxx, final_xxx）
+      const isApplicationInterview = editingSchedule.id.match(/^(first|second|final)_(.+)$/);
 
-      if (isInterviewSchedule) {
-        // 从标题中提取公司名称和面试类型
-        const titleParts = scheduleForm.title.split(' - ');
-        const companyName = titleParts[0];
-        const interviewType = titleParts[1] || isInterviewSchedule.interview_type;
+      if (isApplicationInterview) {
+        const [, interviewType, applicationId] = isApplicationInterview;
+        
+        // 构建更新数据
+        const updateData: any = {
+          interview_location: scheduleForm.location || null,
+          interview_notes: scheduleForm.description || null,
+          interview_status: 'scheduled'
+        };
 
-        // 更新 interviews 表中的记录
+        // 更新对应的面试时间字段
+        switch (interviewType) {
+          case 'first':
+            updateData.first_interview_at = `${scheduleForm.date}T${scheduleForm.startTime}:00`;
+            break;
+          case 'second':
+            updateData.second_interview_at = `${scheduleForm.date}T${scheduleForm.startTime}:00`;
+            break;
+          case 'final':
+            updateData.final_interview_at = `${scheduleForm.date}T${scheduleForm.startTime}:00`;
+            break;
+        }
+
+        // 更新应聘记录
         const { error: updateError } = await supabase
-          .from('interviews')
-          .update({
-            company_name: companyName,
-            interview_type: interviewType,
-            scheduled_date: scheduleForm.date,
-            scheduled_time: `${scheduleForm.startTime}:00`,
-            notes: scheduleForm.description || null,
-            location: scheduleForm.location || null,
-            status: 'scheduled',
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', editingSchedule.id);
+          .from('applications')
+          .update(updateData)
+          .eq('id', applicationId);
 
         if (updateError) throw updateError;
 
@@ -414,7 +399,10 @@ function StudentScheduleContent() {
         if (!confirm("面接予定をキャンセルしますか？\n\n注意：この操作は応募記録にも影響します。")) return;
 
         // 构建更新数据
-        const updateData: any = {};
+        const updateData: any = {
+          interview_status: 'cancelled'
+        };
+        
         switch (interviewType) {
           case 'first':
             updateData.first_interview_at = null;
@@ -443,33 +431,13 @@ function StudentScheduleContent() {
           description: "応募記録も更新されました",
         });
       } else {
-        // 检查是否是面试预约的日程（UUID格式）
-        const isInterviewSchedule = interviews.find(i => i.id === scheduleId);
-        
-        if (isInterviewSchedule) {
-          if (!confirm("面接予定をキャンセルしますか？")) return;
-
-          // 从 interviews 表中删除记录
-          const { error: deleteError } = await supabase
-            .from('interviews')
-            .delete()
-            .eq('id', scheduleId);
-
-          if (deleteError) throw deleteError;
-
-          toast({
-            title: "面接予定をキャンセルしました",
-            description: "予約が削除されました",
-          });
-        } else {
-          // 普通的日程删除
-          if (!confirm("このスケジュールを削除しますか？")) return;
-          await deleteSchedule(scheduleId);
-          toast({
-            title: "削除完了",
-            description: "スケジュールを削除しました",
-          });
-        }
+        // 普通的日程删除
+        if (!confirm("このスケジュールを削除しますか？")) return;
+        await deleteSchedule(scheduleId);
+        toast({
+          title: "削除完了",
+          description: "スケジュールを削除しました",
+        });
       }
 
       // 重新加载数据
@@ -679,7 +647,6 @@ function StudentScheduleContent() {
             <TabsList>
               <TabsTrigger value="schedule">週間スケジュール</TabsTrigger>
               <TabsTrigger value="list">予定一覧</TabsTrigger>
-              <TabsTrigger value="interviews">面接管理</TabsTrigger>
             </TabsList>
 
             {/* 周间日程管理 */}
@@ -948,48 +915,6 @@ function StudentScheduleContent() {
                     面接予定は自動的にスケジュールに反映されます
                   </CardDescription>
                 </CardHeader>
-                <CardContent>
-                  {interviews.length === 0 ? (
-                    <div className="text-center py-8 text-muted-foreground">
-                      まだ面接予定がありません
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      {interviews
-                        .sort((a, b) => `${a.scheduled_date} ${a.scheduled_time}`.localeCompare(`${b.scheduled_date} ${b.scheduled_time}`))
-                        .map((interview) => (
-                        <Card key={interview.id} className="border-l-4 border-l-purple-500">
-                          <CardContent className="p-4">
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <div className="font-medium text-purple-900">{interview.company_name}</div>
-                                <div className="text-sm text-muted-foreground">
-                                  {format(parseISO(interview.scheduled_date), 'yyyy年MM月dd日', { locale: ja })} {interview.scheduled_time}
-                                </div>
-                                <div className="text-sm text-purple-700 mt-1">
-                                  {interview.interview_type}
-                                </div>
-                                {interview.notes && (
-                                  <div className="text-sm text-muted-foreground mt-1">
-                                    {interview.notes}
-                                  </div>
-                                )}
-                              </div>
-                              <Badge 
-                                variant={interview.status === 'scheduled' ? 'default' : 'secondary'}
-                                className={interview.status === 'scheduled' ? 'bg-purple-100 text-purple-800' : ''}
-                              >
-                                {interview.status === 'scheduled' ? '予定' : 
-                                 interview.status === 'completed' ? '完了' : 
-                                 interview.status === 'cancelled' ? 'キャンセル' : interview.status}
-                              </Badge>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
               </Card>
             </TabsContent>
           </Tabs>

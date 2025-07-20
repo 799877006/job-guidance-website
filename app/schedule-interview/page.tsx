@@ -20,42 +20,46 @@ import {
 import { Calendar, Clock, Building, ArrowLeft, Plus, Edit, Trash2 } from "lucide-react"
 import { ProtectedRoute } from "@/components/protected-route"
 import { useAuth } from "@/components/auth-provider"
-import { supabase, type Interview } from "@/lib/supabase"
+import { supabase } from "@/lib/supabase"
 import { useToast } from "@/hooks/use-toast"
+import { Application, ApplicationStatus } from "@/lib/types/application"
+import { format } from "date-fns"
 
 export default function ScheduleInterviewPage() {
   const { user } = useAuth()
   const { toast } = useToast()
-  const [interviews, setInterviews] = useState<Interview[]>([])
+  const [applications, setApplications] = useState<Application[]>([])
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
-  const [editingInterview, setEditingInterview] = useState<Interview | null>(null)
+  const [editingApplication, setEditingApplication] = useState<Application | null>(null)
   const [formData, setFormData] = useState({
     company_name: "",
+    position: "",
     interview_type: "",
     scheduled_date: "",
     scheduled_time: "",
-    notes: "",
+    interview_notes: "",
+    interview_location: "",
   })
 
   useEffect(() => {
     if (user) {
-      fetchInterviews()
+      fetchApplications()
     }
   }, [user])
 
-  const fetchInterviews = async () => {
+  const fetchApplications = async () => {
     try {
       const { data, error } = await supabase
-        .from("interviews")
+        .from("applications")
         .select("*")
         .eq("user_id", user!.id)
-        .order("scheduled_date", { ascending: false })
+        .order("created_at", { ascending: false })
 
       if (error) throw error
-      setInterviews(data || [])
+      setApplications(data || [])
     } catch (error) {
-      console.error("Error fetching interviews:", error)
+      console.error("Error fetching applications:", error)
       toast({
         title: "エラー",
         description: "面接データの取得に失敗しました",
@@ -70,18 +74,37 @@ export default function ScheduleInterviewPage() {
     e.preventDefault()
 
     try {
-      if (editingInterview) {
-        // Update existing interview
+      const interviewDateTime = `${formData.scheduled_date}T${formData.scheduled_time}:00`;
+      let updateData: any = {
+        company_name: formData.company_name,
+        position: formData.position,
+        interview_notes: formData.interview_notes,
+        interview_location: formData.interview_location,
+        interview_status: 'scheduled'
+      };
+
+      // 根据面试类型设置对应的面试时间和状态
+      switch (formData.interview_type) {
+        case '一次面接':
+          updateData.first_interview_at = interviewDateTime;
+          updateData.status = '一次面接待ち';
+          break;
+        case '二次面接':
+          updateData.second_interview_at = interviewDateTime;
+          updateData.status = '二次面接待ち';
+          break;
+        case '最終面接':
+          updateData.final_interview_at = interviewDateTime;
+          updateData.status = '最終面接待ち';
+          break;
+      }
+
+      if (editingApplication) {
+        // 更新现有应聘记录
         const { error } = await supabase
-          .from("interviews")
-          .update({
-            company_name: formData.company_name,
-            interview_type: formData.interview_type,
-            scheduled_date: formData.scheduled_date,
-            scheduled_time: formData.scheduled_time,
-            notes: formData.notes,
-          })
-          .eq("id", editingInterview.id)
+          .from("applications")
+          .update(updateData)
+          .eq("id", editingApplication.id)
 
         if (error) throw error
         toast({
@@ -89,18 +112,13 @@ export default function ScheduleInterviewPage() {
           description: "面接情報を更新しました",
         })
       } else {
-        // Create new interview
-        const { error } = await supabase.from("interviews").insert([
-          {
-            user_id: user!.id,
-            company_name: formData.company_name,
-            interview_type: formData.interview_type,
-            scheduled_date: formData.scheduled_date,
-            scheduled_time: formData.scheduled_time,
-            notes: formData.notes,
-            status: "scheduled",
-          },
-        ])
+        // 创建新的应聘记录
+        updateData.user_id = user!.id;
+        updateData.applied_at = new Date().toISOString();
+        
+        const { error } = await supabase
+          .from("applications")
+          .insert([updateData])
 
         if (error) throw error
         toast({
@@ -110,17 +128,19 @@ export default function ScheduleInterviewPage() {
       }
 
       setDialogOpen(false)
-      setEditingInterview(null)
+      setEditingApplication(null)
       setFormData({
         company_name: "",
+        position: "",
         interview_type: "",
         scheduled_date: "",
         scheduled_time: "",
-        notes: "",
+        interview_notes: "",
+        interview_location: "",
       })
-      fetchInterviews()
+      fetchApplications()
     } catch (error) {
-      console.error("Error saving interview:", error)
+      console.error("Error saving application:", error)
       toast({
         title: "エラー",
         description: "面接の保存に失敗しました",
@@ -129,14 +149,38 @@ export default function ScheduleInterviewPage() {
     }
   }
 
-  const handleEdit = (interview: Interview) => {
-    setEditingInterview(interview)
+  const handleEdit = (application: Application) => {
+    setEditingApplication(application)
+    // 确定面试类型和时间
+    let interview_type = "";
+    let scheduled_date = "";
+    let scheduled_time = "";
+    
+    if (application.first_interview_at) {
+      interview_type = "一次面接";
+      const date = new Date(application.first_interview_at);
+      scheduled_date = format(date, "yyyy-MM-dd");
+      scheduled_time = format(date, "HH:mm");
+    } else if (application.second_interview_at) {
+      interview_type = "二次面接";
+      const date = new Date(application.second_interview_at);
+      scheduled_date = format(date, "yyyy-MM-dd");
+      scheduled_time = format(date, "HH:mm");
+    } else if (application.final_interview_at) {
+      interview_type = "最終面接";
+      const date = new Date(application.final_interview_at);
+      scheduled_date = format(date, "yyyy-MM-dd");
+      scheduled_time = format(date, "HH:mm");
+    }
+
     setFormData({
-      company_name: interview.company_name,
-      interview_type: interview.interview_type,
-      scheduled_date: interview.scheduled_date,
-      scheduled_time: interview.scheduled_time,
-      notes: interview.notes || "",
+      company_name: application.company_name,
+      position: application.position || "",
+      interview_type,
+      scheduled_date,
+      scheduled_time,
+      interview_notes: application.interview_notes || "",
+      interview_location: application.interview_location || "",
     })
     setDialogOpen(true)
   }
@@ -145,16 +189,19 @@ export default function ScheduleInterviewPage() {
     if (!confirm("この面接を削除しますか？")) return
 
     try {
-      const { error } = await supabase.from("interviews").delete().eq("id", id)
+      const { error } = await supabase
+        .from("applications")
+        .delete()
+        .eq("id", id)
 
       if (error) throw error
       toast({
         title: "削除完了",
         description: "面接を削除しました",
       })
-      fetchInterviews()
+      fetchApplications()
     } catch (error) {
-      console.error("Error deleting interview:", error)
+      console.error("Error deleting application:", error)
       toast({
         title: "エラー",
         description: "面接の削除に失敗しました",
@@ -163,23 +210,68 @@ export default function ScheduleInterviewPage() {
     }
   }
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status: ApplicationStatus) => {
     switch (status) {
-      case "scheduled":
+      case '一次面接待ち':
+      case '二次面接待ち':
+      case '最終面接待ち':
         return <Badge className="bg-blue-100 text-blue-800">予定</Badge>
-      case "completed":
+      case '一次面接完了':
+      case '二次面接完了':
+      case '最終面接完了':
         return <Badge className="bg-green-100 text-green-800">完了</Badge>
-      case "cancelled":
-        return <Badge className="bg-red-100 text-red-800">キャンセル</Badge>
+      case '内定':
+        return <Badge className="bg-purple-100 text-purple-800">内定</Badge>
+      case '不合格':
+        return <Badge className="bg-red-100 text-red-800">不合格</Badge>
       default:
         return <Badge variant="outline">{status}</Badge>
     }
   }
 
+  const getInterviewDateTime = (application: Application) => {
+    if (application.first_interview_at) {
+      return {
+        date: format(new Date(application.first_interview_at), "yyyy-MM-dd"),
+        time: format(new Date(application.first_interview_at), "HH:mm"),
+        type: "一次面接"
+      };
+    }
+    if (application.second_interview_at) {
+      return {
+        date: format(new Date(application.second_interview_at), "yyyy-MM-dd"),
+        time: format(new Date(application.second_interview_at), "HH:mm"),
+        type: "二次面接"
+      };
+    }
+    if (application.final_interview_at) {
+      return {
+        date: format(new Date(application.final_interview_at), "yyyy-MM-dd"),
+        time: format(new Date(application.final_interview_at), "HH:mm"),
+        type: "最終面接"
+      };
+    }
+    return null;
+  }
+
+  // 只获取有面试的应聘记录
+  const interviewApplications = applications.filter(
+    app => app.first_interview_at || app.second_interview_at || app.final_interview_at
+  );
+
   const stats = {
-    total: interviews.length,
-    scheduled: interviews.filter((i) => i.status === "scheduled").length,
-    completed: interviews.filter((i) => i.status === "completed").length,
+    total: interviewApplications.length,
+    scheduled: interviewApplications.filter((a) => 
+      a.status === '一次面接待ち' || 
+      a.status === '二次面接待ち' || 
+      a.status === '最終面接待ち'
+    ).length,
+    completed: interviewApplications.filter((a) => 
+      a.status === '一次面接完了' || 
+      a.status === '二次面接完了' || 
+      a.status === '最終面接完了' || 
+      a.status === '内定'
+    ).length,
   }
 
   if (loading) {
@@ -210,13 +302,15 @@ export default function ScheduleInterviewPage() {
                 <DialogTrigger asChild>
                   <Button
                     onClick={() => {
-                      setEditingInterview(null)
+                      setEditingApplication(null)
                       setFormData({
                         company_name: "",
+                        position: "",
                         interview_type: "",
                         scheduled_date: "",
                         scheduled_time: "",
-                        notes: "",
+                        interview_notes: "",
+                        interview_location: "",
                       })
                     }}
                   >
@@ -226,7 +320,7 @@ export default function ScheduleInterviewPage() {
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
-                    <DialogTitle>{editingInterview ? "面接情報編集" : "新規面接予約"}</DialogTitle>
+                    <DialogTitle>{editingApplication ? "面接情報編集" : "新規面接予約"}</DialogTitle>
                     <DialogDescription>面接の詳細情報を入力してください</DialogDescription>
                   </DialogHeader>
                   <form onSubmit={handleSubmit} className="space-y-4">
@@ -237,6 +331,16 @@ export default function ScheduleInterviewPage() {
                         placeholder="株式会社○○"
                         value={formData.company_name}
                         onChange={(e) => setFormData((prev) => ({ ...prev, company_name: e.target.value }))}
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="position">職種 *</Label>
+                      <Input
+                        id="position"
+                        placeholder="エンジニア"
+                        value={formData.position}
+                        onChange={(e) => setFormData((prev) => ({ ...prev, position: e.target.value }))}
                         required
                       />
                     </div>
@@ -253,8 +357,6 @@ export default function ScheduleInterviewPage() {
                           <SelectItem value="一次面接">一次面接</SelectItem>
                           <SelectItem value="二次面接">二次面接</SelectItem>
                           <SelectItem value="最終面接">最終面接</SelectItem>
-                          <SelectItem value="グループ面接">グループ面接</SelectItem>
-                          <SelectItem value="オンライン面接">オンライン面接</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -281,16 +383,25 @@ export default function ScheduleInterviewPage() {
                       </div>
                     </div>
                     <div className="space-y-2">
+                      <Label htmlFor="location">面接場所</Label>
+                      <Input
+                        id="location"
+                        placeholder="東京都渋谷区..."
+                        value={formData.interview_location}
+                        onChange={(e) => setFormData((prev) => ({ ...prev, interview_location: e.target.value }))}
+                      />
+                    </div>
+                    <div className="space-y-2">
                       <Label htmlFor="notes">メモ</Label>
                       <Textarea
                         id="notes"
                         placeholder="面接に関するメモや準備事項"
-                        value={formData.notes}
-                        onChange={(e) => setFormData((prev) => ({ ...prev, notes: e.target.value }))}
+                        value={formData.interview_notes}
+                        onChange={(e) => setFormData((prev) => ({ ...prev, interview_notes: e.target.value }))}
                       />
                     </div>
                     <Button type="submit" className="w-full">
-                      {editingInterview ? "更新" : "予約を追加"}
+                      {editingApplication ? "更新" : "予約を追加"}
                     </Button>
                   </form>
                 </DialogContent>
@@ -340,42 +451,53 @@ export default function ScheduleInterviewPage() {
               <CardDescription>すべての面接予定と履歴</CardDescription>
             </CardHeader>
             <CardContent>
-              {interviews.length > 0 ? (
+              {interviewApplications.length > 0 ? (
                 <div className="space-y-4">
-                  {interviews.map((interview) => (
-                    <div
-                      key={interview.id}
-                      className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50"
-                    >
-                      <div className="flex items-center space-x-4">
-                        <div className="flex-shrink-0">
-                          <Building className="h-8 w-8 text-gray-400" />
-                        </div>
-                        <div>
-                          <div className="font-medium text-gray-900">{interview.company_name}</div>
-                          <div className="flex items-center text-sm text-gray-600 mt-1">
-                            <Calendar className="h-4 w-4 mr-1" />
-                            {interview.scheduled_date}
-                            <Clock className="h-4 w-4 ml-3 mr-1" />
-                            {interview.scheduled_time}
+                  {interviewApplications.map((application) => {
+                    const interviewInfo = getInterviewDateTime(application);
+                    if (!interviewInfo) return null;
+
+                    return (
+                      <div
+                        key={application.id}
+                        className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50"
+                      >
+                        <div className="flex items-center space-x-4">
+                          <div className="flex-shrink-0">
+                            <Building className="h-8 w-8 text-gray-400" />
                           </div>
-                          {interview.notes && <div className="text-sm text-gray-500 mt-1">{interview.notes}</div>}
+                          <div>
+                            <div className="font-medium text-gray-900">{application.company_name}</div>
+                            <div className="text-sm text-gray-600">{application.position}</div>
+                            <div className="flex items-center text-sm text-gray-600 mt-1">
+                              <Calendar className="h-4 w-4 mr-1" />
+                              {interviewInfo.date}
+                              <Clock className="h-4 w-4 ml-3 mr-1" />
+                              {interviewInfo.time}
+                            </div>
+                            {application.interview_location && (
+                              <div className="text-sm text-gray-500 mt-1">📍 {application.interview_location}</div>
+                            )}
+                            {application.interview_notes && (
+                              <div className="text-sm text-gray-500 mt-1">{application.interview_notes}</div>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-3">
+                          <Badge variant="outline">{interviewInfo.type}</Badge>
+                          {getStatusBadge(application.status)}
+                          <div className="flex space-x-1">
+                            <Button variant="ghost" size="sm" onClick={() => handleEdit(application)}>
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="sm" onClick={() => handleDelete(application.id)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </div>
                       </div>
-                      <div className="flex items-center space-x-3">
-                        <Badge variant="outline">{interview.interview_type}</Badge>
-                        {getStatusBadge(interview.status)}
-                        <div className="flex space-x-1">
-                          <Button variant="ghost" size="sm" onClick={() => handleEdit(interview)}>
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={() => handleDelete(interview.id)}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="text-center py-12 text-gray-500">
