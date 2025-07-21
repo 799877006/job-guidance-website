@@ -115,20 +115,47 @@ export async function createProfile(userId: string) {
 export async function signIn(email: string, password: string) {
   try {
     console.log("开始signin")
-    const { data: { user }, error } = await supabase.auth.signInWithPassword({
+    
+    // 清除可能存在的旧session
+    await supabase.auth.signOut()
+    
+    // 创建超时Promise
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('登录请求超时')), 10000)
+    })
+
+    // 登录Promise
+    const loginPromise = supabase.auth.signInWithPassword({
       email,
       password,
     })
-    console.log("signinwithpassword成功")
+
+    // 使用Promise.race来处理超时
+    const result = await Promise.race([loginPromise, timeoutPromise])
+      .catch(error => {
+        console.error('登录过程出错:', error)
+        throw error
+      })
+
+    // 类型断言，因为我们知道result来自loginPromise
+    const { data: { user }, error } = result as Awaited<typeof loginPromise>
     
     if (error) {
       console.error('Sign in error:', error)
       throw error
     }
 
+    if (!user) {
+      console.error('登录成功但未获取到用户信息')
+      throw new Error('ログインに失敗しました')
+    }
+
+    console.log("signinwithpassword成功")
     return { user }
   } catch (error) {
     console.error('Sign in error:', error)
+    // 清理可能的损坏状态
+    await supabase.auth.signOut()
     throw error
   }
 }

@@ -29,7 +29,19 @@ export default function LoginPage() {
     setError("")
 
     try {
-      console.log("开始signin")
+      // 检查并清理可能存在的旧session
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session) {
+        console.log("发现旧session，正在清理...")
+        await supabase.auth.signOut()
+        // 确保localStorage中的认证相关数据被清理
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('supabase.auth.token')
+          localStorage.removeItem('supabase.auth.expires_at')
+          localStorage.removeItem('supabase.auth.refresh_token')
+        }
+      }
+
       const result = await signIn(email, password)
       console.log("登录结果:", result)
       
@@ -38,11 +50,16 @@ export default function LoginPage() {
       }
 
       // 获取用户角色
-      const { data: profile } = await supabase
+      const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('role')
         .eq('id', result.user.id)
         .single()
+
+      if (profileError) {
+        console.error("获取用户角色失败:", profileError)
+        throw new Error("登录失败：获取用户角色时出错")
+      }
 
       if (!profile) {
         throw new Error("登录失败：未获取到用户角色信息")
