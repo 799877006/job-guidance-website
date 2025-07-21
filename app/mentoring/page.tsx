@@ -62,35 +62,25 @@ export default function MentoringPage() {
   const [loading, setLoading] = useState(false)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
 
-  // 如果用户不是学生，显示提示
-  if (profile?.role !== 'student') {
-    return (
-      <div className="container mx-auto p-6">
-        <Card>
-          <CardContent className="pt-6">
-            <div className="text-center">
-              <AlertCircle className="mx-auto h-12 w-12 text-yellow-500 mb-4" />
-              <h3 className="text-lg font-medium">アクセス権限がありません</h3>
-              <p className="text-muted-foreground">このページは学生のみアクセス可能です。</p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    )
-  }
-
   useEffect(() => {
-    loadAvailableSlots()
-    loadMyBookings()
-  }, [selectedDate])
+    if (profile?.role === 'student') {
+      loadAvailableSlots()
+      loadMyBookings()
+    }
+  }, [selectedDate, profile?.role])
 
   const loadAvailableSlots = async () => {
     try {
       const dateStr = format(selectedDate, 'yyyy-MM-dd')
       const slots = await getAvailableInstructors(dateStr)
       setAvailableSlots(slots || [])
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error loading available slots:', error)
+      toast({
+        title: "時間枠の取得に失敗しました",
+        description: error.message || "利用可能な時間枠を取得中にエラーが発生しました",
+        variant: "destructive"
+      })
     }
   }
 
@@ -123,7 +113,7 @@ export default function MentoringPage() {
 
       toast({
         title: "予約が完了しました",
-        description: "指導者からの確認をお待ちください",
+        description: "指導者からの確認をお待ちください。承認されるまでこの時間枠は仮予約状態となります。",
       })
 
       setIsDialogOpen(false)
@@ -134,7 +124,7 @@ export default function MentoringPage() {
     } catch (error: any) {
       toast({
         title: "予約に失敗しました",
-        description: error.message,
+        description: error.message || "予約処理中にエラーが発生しました",
         variant: "destructive"
       })
     }
@@ -169,6 +159,22 @@ export default function MentoringPage() {
       days.push(addDays(start, i))
     }
     return days
+  }
+
+  if (profile?.role !== 'student') {
+    return (
+      <div className="container mx-auto p-6">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-center">
+              <AlertCircle className="mx-auto h-12 w-12 text-yellow-500 mb-4" />
+              <h3 className="text-lg font-medium">アクセス権限がありません</h3>
+              <p className="text-muted-foreground">このページは学生のみアクセス可能です。</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   return (

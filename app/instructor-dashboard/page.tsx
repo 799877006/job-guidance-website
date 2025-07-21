@@ -187,7 +187,7 @@ function InstructorDashboardContent() {
     } catch (error: any) {
       toast({
         title: "追加に失敗しました",
-        description: error.message,
+        description: error.message || "時間帯の追加中にエラーが発生しました",
         variant: "destructive"
       })
     }
@@ -201,14 +201,14 @@ function InstructorDashboardContent() {
       
       toast({
         title: action === 'confirmed' ? "予約を承認しました" : "予約を拒否しました",
-        description: action === 'confirmed' ? "学生に通知されます" : "学生に拒否理由が通知されます",
+        description: action === 'confirmed' ? "学生に通知されます。この時間帯は他の予約を受け付けません。" : "学生に拒否理由が通知されます",
       })
 
       loadData()
     } catch (error: any) {
       toast({
         title: "操作に失敗しました",
-        description: error.message,
+        description: error.message || "予約のステータス更新中にエラーが発生しました",
         variant: "destructive"
       })
     }

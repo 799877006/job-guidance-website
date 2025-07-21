@@ -29,6 +29,7 @@ export default function LoginPage() {
     setError("")
 
     try {
+      console.log("开始signin")
       const result = await signIn(email, password)
       console.log("登录结果:", result)
       
