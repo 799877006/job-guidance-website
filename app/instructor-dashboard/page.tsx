@@ -1,6 +1,6 @@
 "use client"
 
-import React, { Suspense, useState, useEffect } from "react"
+import React, { Suspense, useState, useEffect, useCallback } from "react"
 import { useAuth } from "@/components/auth-provider"
 import { useSearchParams } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Calendar, Clock, User, BookOpen, CheckCircle, XCircle, AlertCircle, Plus, Settings, Users } from "lucide-react"
+import { Calendar, Clock, User, BookOpen, CheckCircle, XCircle, AlertCircle, Plus, Settings, Users, TrendingUp, LogOut } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { 
   getInstructorAvailability, 
@@ -25,6 +25,8 @@ import {
 } from "@/lib/mentoring"
 import { format, addDays, startOfWeek, endOfWeek, isSameDay, parseISO } from "date-fns"
 import { ja } from "date-fns/locale"
+import Link from "next/link"
+import { useRouter } from "next/navigation"
 
 interface Availability {
   id: string
@@ -68,9 +70,10 @@ function LoadingState() {
 
 // 主要内容组件
 function InstructorDashboardContent() {
-  const { user, profile } = useAuth()
+  const { user, profile, signOut } = useAuth()
   const { toast } = useToast()
   const searchParams = useSearchParams()
+  const router = useRouter()
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [activeTab, setActiveTab] = useState("schedule")
   const [myAvailability, setMyAvailability] = useState<Availability[]>([])
@@ -85,36 +88,25 @@ function InstructorDashboardContent() {
   const [loading, setLoading] = useState(false)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
 
-  // 如果用户不是导师，显示提示
-  if (profile?.role !== 'instructor') {
-    return (
-      <div className="container mx-auto p-6">
-        <Card>
-          <CardContent className="pt-6">
-            <div className="text-center">
-              <AlertCircle className="mx-auto h-12 w-12 text-yellow-500 mb-4" />
-              <h3 className="text-lg font-medium">アクセス権限がありません</h3>
-              <p className="text-muted-foreground">このページは指導者のみアクセス可能です。</p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    )
+  // 添加登出处理函数
+  const handleSignOut = async () => {
+    try {
+      await signOut()
+      toast({
+        title: "ログアウト",
+        description: "正常にログアウトしました",
+      })
+      router.push('/login')
+    } catch (error) {
+      toast({
+        title: "エラー",
+        description: "ログアウトに失敗しました",
+        variant: "destructive",
+      })
+    }
   }
 
-  // 处理URL参数，设置默认标签
-  useEffect(() => {
-    const tab = searchParams.get('tab')
-    if (tab && ['schedule', 'bookings', 'pending'].includes(tab)) {
-      setActiveTab(tab)
-    }
-  }, [searchParams])
-
-  useEffect(() => {
-    loadData()
-  }, [selectedDate])
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     if (!user?.id) return
     
     try {
@@ -134,6 +126,35 @@ function InstructorDashboardContent() {
     } catch (error) {
       console.error('Error loading data:', error)
     }
+  }, [user?.id, selectedDate])
+
+  // 处理URL参数，设置默认标签
+  useEffect(() => {
+    const tab = searchParams.get('tab')
+    if (tab && ['schedule', 'bookings', 'pending'].includes(tab)) {
+      setActiveTab(tab)
+    }
+  }, [searchParams])
+
+  useEffect(() => {
+    loadData()
+  }, [loadData])
+
+  // 如果用户不是导师，显示提示
+  if (profile?.role !== 'instructor') {
+    return (
+      <div className="container mx-auto p-6">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-center">
+              <AlertCircle className="mx-auto h-12 w-12 text-yellow-500 mb-4" />
+              <h3 className="text-lg font-medium">アクセス権限がありません</h3>
+              <p className="text-muted-foreground">このページは指導者のみアクセス可能です。</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   const handleCreateAvailability = async () => {
@@ -231,12 +252,78 @@ function InstructorDashboardContent() {
           <h1 className="text-3xl font-bold">指导者ダッシュボード</h1>
           <p className="text-muted-foreground">予約管理と空き時間の設定</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
+          <Link href="/instructor-profile">
+            <Button variant="outline" size="sm" className="flex items-center gap-2">
+              <User className="h-4 w-4" />
+              プロフィール
+            </Button>
+          </Link>
+          <Button variant="ghost" size="sm" onClick={handleSignOut} className="flex items-center gap-2">
+            <LogOut className="h-4 w-4" />
+            ログアウト
+          </Button>
           <Badge variant="outline" className="flex items-center gap-1">
             <Users className="h-3 w-3" />
             待機中: {pendingBookings.length}
           </Badge>
         </div>
+      </div>
+
+      {/* 统计卡片 */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-gray-600">今月の指導回数</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-600">
+              {myBookings.filter(b => 
+                b.status === 'completed' && 
+                new Date(b.date).getMonth() === new Date().getMonth()
+              ).length}
+            </div>
+            <p className="text-xs text-gray-500 mt-1">
+              <TrendingUp className="inline h-3 w-3 mr-1" />
+              今月の実績
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-gray-600">予約待ち</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-yellow-600">{pendingBookings.length}</div>
+            <p className="text-xs text-gray-500 mt-1">承認待ちの予約</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-gray-600">今後の予約</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">
+              {myBookings.filter(b => 
+                b.status === 'confirmed' && 
+                new Date(b.date) > new Date()
+              ).length}
+            </div>
+            <p className="text-xs text-gray-500 mt-1">確定済みの予約</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-gray-600">空き時間枠</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-purple-600">{myAvailability.length}</div>
+            <p className="text-xs text-gray-500 mt-1">予約可能な時間枠</p>
+          </CardContent>
+        </Card>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">

@@ -28,6 +28,7 @@ import {
 import { supabase, type Interview } from "@/lib/supabase"
 import { format, addDays, startOfWeek, endOfWeek, isSameDay, parseISO } from "date-fns"
 import { ja } from "date-fns/locale"
+import { useRouter } from "next/navigation"
 
 // 加载状态组件
 function LoadingState() {
@@ -47,6 +48,15 @@ function StudentScheduleContent() {
   const { user, profile } = useAuth()
   const { toast } = useToast()
   const searchParams = useSearchParams()
+  const router = useRouter()
+
+  // 添加重定向逻辑
+  useEffect(() => {
+    if (profile?.role === 'instructor') {
+      router.push('/instructor-dashboard')
+    }
+  }, [profile, router])
+
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [activeTab, setActiveTab] = useState("schedule")
   const [mySchedule, setMySchedule] = useState<StudentSchedule[]>([])

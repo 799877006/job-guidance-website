@@ -324,4 +324,22 @@ export type Database = {
       application_status: 'applied' | 'rejected' | 'accepted' | 'pending'
     }
   }
+}
+
+export interface Profile {
+  id: string
+  full_name: string | null
+  avatar_url: string | null
+  university: string | null
+  major: string | null
+  graduation_year: string | null
+  role: 'student' | 'instructor' | 'admin'
+  created_at: string
+  updated_at: string
+  // 指导者特有字段
+  phone: string | null
+  department: string | null
+  position: string | null
+  specialization: string | null
+  bio: string | null
 } 

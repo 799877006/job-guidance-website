@@ -31,6 +31,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { MessageBox } from '@/components/message-box';
 import { getLatestJobAdvertisements } from '@/lib/dashboard';
 import type { JobAdvertisement } from '@/lib/types/dashboard';
+import { useRouter } from "next/navigation";
 
 interface DashboardStats {
   total: number;
@@ -42,7 +43,15 @@ interface DashboardStats {
 export default function DashboardPage() {
   const { toast } = useToast();
   const { user, profile, signOut } = useAuth();
+  const router = useRouter();
   
+  // 添加重定向逻辑
+  useEffect(() => {
+    if (profile?.role === 'instructor') {
+      router.push('/instructor-dashboard');
+    }
+  }, [profile, router]);
+
   // 学生用状态
   const [stats, setStats] = useState<DashboardStats>({
     total: 0,

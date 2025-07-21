@@ -13,6 +13,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Briefcase, Eye, EyeOff } from "lucide-react"
 import { signIn } from "@/lib/auth"
 import { useToast } from "@/hooks/use-toast"
+import { supabase } from "@/lib/supabase"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
@@ -40,6 +41,13 @@ export default function LoginPage() {
         throw new Error("登录失败：未获取到用户信息")
       }
 
+      // 获取用户角色
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', result.user.id)
+        .single()
+
       toast({
         title: "ログイン成功",
         description: "ダッシュボードにリダイレクトしています...",
@@ -48,8 +56,8 @@ export default function LoginPage() {
       // 等待一小段时间确保状态更新
       await new Promise(resolve => setTimeout(resolve, 500))
 
-      // 强制刷新页面并跳转
-      window.location.href = "/dashboard"
+      // 根据用户角色跳转到不同的仪表板
+      window.location.href = profile?.role === 'instructor' ? "/instructor-dashboard" : "/dashboard"
     } catch (err: any) {
       console.error("登录错误:", err)
       setError(err.message || "ログインに失敗しました")
