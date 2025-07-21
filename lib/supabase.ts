@@ -4,6 +4,9 @@ import type { Database } from './types/supabase'
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
+// 检查是否在浏览器环境中
+const isBrowser = typeof window !== 'undefined'
+
 // 添加缓存键前缀常量
 const CACHE_KEY_PREFIX = 'job_guidance'
 
@@ -16,24 +19,31 @@ const getRoleCacheKey = (role: string | null) => {
 const customStorageAdapter = {
   getItem: (key: string) => {
     try {
-      return localStorage.getItem(key)
+      if (isBrowser) {
+        return localStorage.getItem(key)
+      }
+      return null
     } catch (error) {
-      console.error('Error reading from localStorage:', error)
+      console.error('Error reading from storage:', error)
       return null
     }
   },
   setItem: (key: string, value: string) => {
     try {
-      localStorage.setItem(key, value)
+      if (isBrowser) {
+        localStorage.setItem(key, value)
+      }
     } catch (error) {
-      console.error('Error writing to localStorage:', error)
+      console.error('Error writing to storage:', error)
     }
   },
   removeItem: (key: string) => {
     try {
-      localStorage.removeItem(key)
+      if (isBrowser) {
+        localStorage.removeItem(key)
+      }
     } catch (error) {
-      console.error('Error removing from localStorage:', error)
+      console.error('Error removing from storage:', error)
     }
   }
 }
@@ -42,9 +52,9 @@ const customStorageAdapter = {
 const supabaseConfig = {
   auth: {
     autoRefreshToken: true,
-    persistSession: true,
+    persistSession: isBrowser, // 只在浏览器环境中持久化会话
     storage: customStorageAdapter,
-    detectSessionInUrl: true
+    detectSessionInUrl: isBrowser // 只在浏览器环境中检测URL中的会话
   }
 }
 
@@ -53,6 +63,8 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, sup
 
 // 清除所有相关缓存
 export const clearAllAuthCache = () => {
+  if (!isBrowser) return
+
   const roles = ['student', 'instructor', 'admin', 'default']
   roles.forEach(role => {
     localStorage.removeItem(`${getRoleCacheKey(role)}.auth.token`)
@@ -67,6 +79,10 @@ export type { Database } from './types/supabase'
 let supabaseClient: ReturnType<typeof createClient<Database>> | null = null
 
 export const getSupabaseBrowserClient = () => {
+  if (!isBrowser) {
+    throw new Error('getSupabaseBrowserClient should only be called in browser environment')
+  }
+
   if (!supabaseClient) {
     supabaseClient = createClient<Database>(supabaseUrl, supabaseAnonKey, supabaseConfig)
   }

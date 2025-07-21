@@ -1,6 +1,9 @@
 import { supabase, clearAllAuthCache } from './supabase'
 import type { Profile } from './types/supabase'
 
+// 检查是否在浏览器环境中
+const isBrowser = typeof window !== 'undefined'
+
 export async function signUp(email: string, password: string, userData: Partial<Profile>) {
   try {
     // 1. 创建认证用户
@@ -41,12 +44,14 @@ export async function signUp(email: string, password: string, userData: Partial<
       avatar_url: null
     };
 
-    localStorage.setItem('pendingProfile', JSON.stringify(pendingProfileData));
-    console.log("用户数据已暂存到 localStorage");
+    if (isBrowser) {
+      localStorage.setItem('pendingProfile', JSON.stringify(pendingProfileData));
+      console.log("用户数据已暂存到 localStorage");
+    }
 
     return data;
   } catch (error: any) {
-    console.error('登録エラー:', error);
+    console.error("注册错误:", error);
     
     // 特定のエラーメッセージをそのまま返す
     if (error.message.includes('このメールアドレスは既に登録されています') ||
@@ -62,13 +67,18 @@ export async function signUp(email: string, password: string, userData: Partial<
 
 export async function createProfile(userId: string) {
   try {
+    let profileData;
+    
     // 从 localStorage 获取暂存的用户数据
-    const pendingProfileData = localStorage.getItem('pendingProfile');
-    if (!pendingProfileData) {
+    if (isBrowser) {
+      const pendingProfileData = localStorage.getItem('pendingProfile');
+      if (!pendingProfileData) {
+        throw new Error('プロフィールデータが見つかりません');
+      }
+      profileData = JSON.parse(pendingProfileData);
+    } else {
       throw new Error('プロフィールデータが見つかりません');
     }
-
-    const profileData = JSON.parse(pendingProfileData);
     
     // 确保 userId 匹配
     if (profileData.id !== userId) {
@@ -91,7 +101,9 @@ export async function createProfile(userId: string) {
     }
 
     // 成功后清除暂存数据
-    localStorage.removeItem('pendingProfile');
+    if (isBrowser) {
+      localStorage.removeItem('pendingProfile');
+    }
     
     return profileData;
   } catch (error: any) {
