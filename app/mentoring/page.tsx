@@ -161,7 +161,24 @@ export default function MentoringPage() {
     return days
   }
 
-  if (profile?.role !== 'student') {
+  // 等待 profile 加载完成
+  if (!profile) {
+    return (
+      <div className="container mx-auto p-6">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
+              <p className="mt-2 text-gray-600">読み込み中...</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  // profile 已加载，但不是学生
+  if (profile.role !== 'student') {
     return (
       <div className="container mx-auto p-6">
         <Card>
