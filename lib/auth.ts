@@ -113,17 +113,18 @@ export async function createProfile(userId: string) {
 }
 
 export async function signIn(email: string, password: string) {
-
   try {
-    // 先清除所有现有的认证缓存
-    clearAllAuthCache()
     console.log("开始signin")
     const { data: { user }, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     })
     console.log("signinwithpassword成功")
-    if (error) throw error
+    
+    if (error) {
+      console.error('Sign in error:', error)
+      throw error
+    }
 
     return { user }
   } catch (error) {
