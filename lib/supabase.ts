@@ -1,56 +1,74 @@
 import { createClient } from '@supabase/supabase-js'
 import type { Database } from './types/supabase'
 
-const supabaseUrl = 'https://krkjwzphsrzwwijiadtw.supabase.co'
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
-// 检查是否在浏览器环境
-const isBrowser = typeof window !== 'undefined'
+// 添加缓存键前缀常量
+const CACHE_KEY_PREFIX = 'job_guidance'
 
-// 基础配置
-const supabaseOptions = {
+// 获取基于角色的缓存键
+const getRoleCacheKey = (role: string | null) => {
+  return `${CACHE_KEY_PREFIX}_${role || 'default'}`
+}
+
+// 创建自定义存储处理器
+const customStorageAdapter = {
+  getItem: (key: string) => {
+    try {
+      return localStorage.getItem(key)
+    } catch (error) {
+      console.error('Error reading from localStorage:', error)
+      return null
+    }
+  },
+  setItem: (key: string, value: string) => {
+    try {
+      localStorage.setItem(key, value)
+    } catch (error) {
+      console.error('Error writing to localStorage:', error)
+    }
+  },
+  removeItem: (key: string) => {
+    try {
+      localStorage.removeItem(key)
+    } catch (error) {
+      console.error('Error removing from localStorage:', error)
+    }
+  }
+}
+
+// Supabase 客户端配置
+const supabaseConfig = {
   auth: {
     autoRefreshToken: true,
     persistSession: true,
-    storage: isBrowser ? {
-      // 只在浏览器环境中使用 localStorage
-      getItem: (key: string) => {
-        try {
-          const value = localStorage.getItem(key)
-          return value ? JSON.parse(value) : null
-        } catch (error) {
-          console.error('Error reading from localStorage:', error)
-          return null
-        }
-      },
-      setItem: (key: string, value: any) => {
-        try {
-          localStorage.setItem(key, JSON.stringify(value))
-        } catch (error) {
-          console.error('Error writing to localStorage:', error)
-        }
-      },
-      removeItem: (key: string) => {
-        try {
-          localStorage.removeItem(key)
-        } catch (error) {
-          console.error('Error removing from localStorage:', error)
-        }
-      },
-    } : undefined, // 服务端不提供存储
-    detectSessionInUrl: false
-  },
+    storage: customStorageAdapter,
+    detectSessionInUrl: true
+  }
 }
 
-// 创建客户端实例
-export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, supabaseOptions)
+// 创建 Supabase 客户端实例
+export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, supabaseConfig)
+
+// 清除所有相关缓存
+export const clearAllAuthCache = () => {
+  const roles = ['student', 'instructor', 'admin', 'default']
+  roles.forEach(role => {
+    localStorage.removeItem(`${getRoleCacheKey(role)}.auth.token`)
+    localStorage.removeItem(`${getRoleCacheKey(role)}.auth.expires_at`)
+    localStorage.removeItem(`${getRoleCacheKey(role)}.auth.refresh_token`)
+  })
+}
+
+export type { Database } from './types/supabase'
 
 // Client-side Supabase client (singleton pattern)
 let supabaseClient: ReturnType<typeof createClient<Database>> | null = null
 
 export const getSupabaseBrowserClient = () => {
   if (!supabaseClient) {
-    supabaseClient = createClient<Database>(supabaseUrl, supabaseAnonKey, supabaseOptions)
+    supabaseClient = createClient<Database>(supabaseUrl, supabaseAnonKey, supabaseConfig)
   }
   return supabaseClient
 }

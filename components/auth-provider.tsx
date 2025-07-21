@@ -4,7 +4,8 @@ import type React from "react"
 
 import { createContext, useContext, useEffect, useState } from "react"
 import type { User, AuthChangeEvent } from "@supabase/supabase-js"
-import { supabase, type Profile } from "@/lib/supabase"
+import { supabase } from "@/lib/supabase"
+import type { Profile } from "@/lib/types/supabase"
 import { getProfile, createProfile } from "@/lib/auth"
 
 interface AuthContextType {
@@ -90,19 +91,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event: AuthChangeEvent, session) => {
       if (!mounted) return
 
-      // 对于TOKEN_REFRESHED事件，静默处理，不显示加载界面
-      if (event === 'TOKEN_REFRESHED') {
-        // 静默更新用户状态，不影响UI
-        setUser(session?.user ?? null)
-        return
-      }
+      console.log('Auth state changed:', event, session); // 添加调试日志
 
-      // 只在用户主动登录/登出时显示加载状态
-      const shouldShowLoading = event === 'SIGNED_OUT'
-      if (shouldShowLoading) {
-        setLoading(true)
-      }
-      
       setUser(session?.user ?? null)
       
       if (session?.user) {
@@ -117,6 +107,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const profileData = await getProfile(session.user.id);
             if (mounted) {
               setProfile(profileData);
+              setLoading(false);
             }
           } catch (error) {
             console.error("创建 profile 失败:", error);
@@ -124,30 +115,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             localStorage.removeItem('pendingProfile');
             if (mounted) {
               setProfile(null);
+              setLoading(false);
             }
           }
         } else {
-          // 只在用户登录时获取 profile，避免token刷新时的重复请求
-          if (event === 'SIGNED_IN') {
-            try {
-              const profileData = await getProfile(session.user.id)
-              if (mounted) {
-                setProfile(profileData)
-              }
-            } catch (error) {
-              console.error("获取 profile 失败:", error)
-              if (mounted) {
-                setProfile(null)
-              }
+          // 获取用户资料
+          try {
+            const profileData = await getProfile(session.user.id)
+            if (mounted) {
+              setProfile(profileData)
+              setLoading(false)
+            }
+          } catch (error) {
+            console.error("获取 profile 失败:", error)
+            if (mounted) {
+              setProfile(null)
+              setLoading(false)
             }
           }
         }
       } else {
         setProfile(null)
-      }
-      
-      // 只在显示了loading的情况下才重置loading状态
-      if (mounted && shouldShowLoading) {
         setLoading(false)
       }
     })

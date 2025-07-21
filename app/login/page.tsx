@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -30,10 +29,6 @@ export default function LoginPage() {
     setError("")
 
     try {
-      // 清理之前的会话数据
-      localStorage.removeItem('supabase.auth.token')
-      localStorage.removeItem('supabase.auth.expires_at')
-      
       const result = await signIn(email, password)
       console.log("登录结果:", result)
       
@@ -48,19 +43,22 @@ export default function LoginPage() {
         .eq('id', result.user.id)
         .single()
 
+      if (!profile) {
+        throw new Error("登录失败：未获取到用户角色信息")
+      }
+
       toast({
         title: "ログイン成功",
         description: "ダッシュボードにリダイレクトしています...",
       })
 
-      // 等待一小段时间确保状态更新
-      await new Promise(resolve => setTimeout(resolve, 500))
-
       // 根据用户角色跳转到不同的仪表板
-      window.location.href = profile?.role === 'instructor' ? "/instructor-dashboard" : "/dashboard"
+      const redirectPath = profile.role === 'instructor' ? '/instructor-dashboard' : '/dashboard'
+      router.push(redirectPath)
     } catch (err: any) {
       console.error("登录错误:", err)
       setError(err.message || "ログインに失敗しました")
+    } finally {
       setLoading(false)
     }
   }

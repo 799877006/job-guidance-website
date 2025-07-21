@@ -1,9 +1,5 @@
-import { toast } from "sonner";
-import { supabase } from "./supabase"
-import type { Profile } from "./supabase"
-
-const MAX_RETRIES = 3
-const TIMEOUT = 10000 // 10 seconds
+import { supabase, clearAllAuthCache } from './supabase'
+import type { Profile } from './types/supabase'
 
 export async function signUp(email: string, password: string, userData: Partial<Profile>) {
   try {
@@ -41,11 +37,8 @@ export async function signUp(email: string, password: string, userData: Partial<
       full_name: userData.full_name || null,
       university: userData.university || null,
       major: userData.major || null,
-      age: null,
       graduation_year: null,
-      bio: null,
-      avatar_url: null,
-      resume_url: null
+      avatar_url: null
     };
 
     localStorage.setItem('pendingProfile', JSON.stringify(pendingProfileData));
@@ -67,7 +60,6 @@ export async function signUp(email: string, password: string, userData: Partial<
   }
 }
 
-// 新增：创建用户 profile
 export async function createProfile(userId: string) {
   try {
     // 从 localStorage 获取暂存的用户数据
@@ -109,41 +101,81 @@ export async function createProfile(userId: string) {
 }
 
 export async function signIn(email: string, password: string) {
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  })
+  try {
+    // 先清除所有现有的认证缓存
+    clearAllAuthCache()
 
-  if (error) throw error
-  return data
+    const { data: { user }, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    })
+
+    if (error) throw error
+
+    return { user }
+  } catch (error) {
+    console.error('Sign in error:', error)
+    throw error
+  }
 }
 
 export async function signOut() {
-  const { error } = await supabase.auth.signOut()
-  if (error) throw error
+  try {
+    const { error } = await supabase.auth.signOut()
+    if (error) throw error
+
+    // 清除所有认证缓存
+    clearAllAuthCache()
+  } catch (error) {
+    console.error('Sign out error:', error)
+    throw error
+  }
 }
 
 export async function getCurrentUser() {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  return user
+  try {
+    const { data: { user }, error } = await supabase.auth.getUser()
+    if (error) throw error
+    return user
+  } catch (error) {
+    console.error('Get current user error:', error)
+    return null
+  }
 }
 
 export async function getProfile(userId: string): Promise<Profile | null> {
-  const { data, error } = await supabase.from("profiles").select("*").eq("id", userId).single()
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .single()
 
-  if (error) {
-    console.error("Error fetching profile:", error)
+    if (error) {
+      console.error('Error fetching profile:', error)
+      return null
+    }
+
+    return data
+  } catch (error) {
+    console.error('Error in getProfile:', error)
     return null
   }
-
-  return data
 }
 
 export async function updateProfile(userId: string, updates: Partial<Profile>) {
-  const { data, error } = await supabase.from("profiles").update(updates).eq("id", userId).select().single()
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .update(updates)
+      .eq('id', userId)
+      .select()
+      .single()
 
-  if (error) throw error
-  return data
+    if (error) throw error
+    return data
+  } catch (error) {
+    console.error('Error updating profile:', error)
+    throw error
+  }
 }
