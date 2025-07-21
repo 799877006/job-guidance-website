@@ -7,53 +7,11 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 // 检查是否在浏览器环境中
 const isBrowser = typeof window !== 'undefined'
 
-// 添加缓存键前缀常量
-const CACHE_KEY_PREFIX = 'job_guidance'
-
-// 获取基于角色的缓存键
-const getRoleCacheKey = (role: string | null) => {
-  return `${CACHE_KEY_PREFIX}_${role || 'default'}`
-}
-
-// 创建自定义存储处理器
-const customStorageAdapter = {
-  getItem: (key: string) => {
-    try {
-      if (isBrowser) {
-        return localStorage.getItem(key)
-      }
-      return null
-    } catch (error) {
-      console.error('Error reading from storage:', error)
-      return null
-    }
-  },
-  setItem: (key: string, value: string) => {
-    try {
-      if (isBrowser) {
-        localStorage.setItem(key, value)
-      }
-    } catch (error) {
-      console.error('Error writing to storage:', error)
-    }
-  },
-  removeItem: (key: string) => {
-    try {
-      if (isBrowser) {
-        localStorage.removeItem(key)
-      }
-    } catch (error) {
-      console.error('Error removing from storage:', error)
-    }
-  }
-}
-
 // Supabase 客户端配置
 const supabaseConfig = {
   auth: {
     autoRefreshToken: true,
     persistSession: isBrowser, // 只在浏览器环境中持久化会话
-    storage: customStorageAdapter,
     detectSessionInUrl: isBrowser // 只在浏览器环境中检测URL中的会话
   }
 }
@@ -61,16 +19,22 @@ const supabaseConfig = {
 // 创建 Supabase 客户端实例
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, supabaseConfig)
 
-// 清除所有相关缓存
+// 清除所有认证相关的缓存
 export const clearAllAuthCache = () => {
   if (!isBrowser) return
 
-  const roles = ['student', 'instructor', 'admin', 'default']
-  roles.forEach(role => {
-    localStorage.removeItem(`${getRoleCacheKey(role)}.auth.token`)
-    localStorage.removeItem(`${getRoleCacheKey(role)}.auth.expires_at`)
-    localStorage.removeItem(`${getRoleCacheKey(role)}.auth.refresh_token`)
-  })
+  // 清理 Supabase 使用的标准 localStorage 键
+  // Supabase 客户端会自动处理这些键，但为了确保完全清理，我们手动操作
+  for (const key in localStorage) {
+    if (key.startsWith('sb-') || key.startsWith('supabase.')) {
+      localStorage.removeItem(key)
+    }
+  }
+  // 额外清理我们之前可能使用的自定义键
+  localStorage.removeItem('job_guidance_student.auth.token')
+  localStorage.removeItem('job_guidance_instructor.auth.token')
+  localStorage.removeItem('job_guidance_admin.auth.token')
+  localStorage.removeItem('job_guidance_default.auth.token')
 }
 
 export type { Database } from './types/supabase'

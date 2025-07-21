@@ -114,19 +114,6 @@ export async function createProfile(userId: string) {
 
 export async function signIn(email: string, password: string) {
   try {
-    console.log("开始signin")
-    
-    // 获取当前session状态
-    const { data: { session } } = await supabase.auth.getSession()
-    console.log("当前session状态:", session)
-    
-    if (session) {
-      console.log("发现旧session，正在清理...")
-      await supabase.auth.signOut()
-      clearAllAuthCache() // 使用统一的缓存清理函数
-      console.log("session清理完毕")
-    }
-
     console.log("开始登录")
     const { data: { user }, error } = await supabase.auth.signInWithPassword({
       email,
@@ -155,12 +142,23 @@ export async function signIn(email: string, password: string) {
 export async function signOut() {
   try {
     const { error } = await supabase.auth.signOut()
-    if (error) throw error
+    if (error) {
+      console.error('Sign out error, but attempting to clear cache anyway', error)
+    }
 
-    // 清除所有认证缓存
+    // 清除所有认证缓存，确保本地状态被重置
     clearAllAuthCache()
+
+    // 额外清理任何可能残留的应用特定用户状态
+    if (isBrowser) {
+      localStorage.removeItem('userProfile') // 假设我们将用户信息存在这里
+      sessionStorage.clear() // 清理会话存储
+    }
+    console.log("Sign out successful and all caches cleared.")
   } catch (error) {
     console.error('Sign out error:', error)
+    // 即使 signOut 失败，也尝试清理缓存
+    clearAllAuthCache()
     throw error
   }
 }
