@@ -29,19 +29,6 @@ export default function LoginPage() {
     setError("")
 
     try {
-      // 检查并清理可能存在的旧session
-      const { data: { session } } = await supabase.auth.getSession()
-      if (session) {
-        console.log("发现旧session，正在清理...")
-        await supabase.auth.signOut()
-        // 确保localStorage中的认证相关数据被清理
-        if (typeof window !== 'undefined') {
-          localStorage.removeItem('supabase.auth.token')
-          localStorage.removeItem('supabase.auth.expires_at')
-          localStorage.removeItem('supabase.auth.refresh_token')
-        }
-      }
-
       const result = await signIn(email, password)
       console.log("登录结果:", result)
       

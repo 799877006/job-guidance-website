@@ -116,29 +116,23 @@ export async function signIn(email: string, password: string) {
   try {
     console.log("开始signin")
     
-    // 清除可能存在的旧session
-    await supabase.auth.signOut()
+    // 获取当前session状态
+    const { data: { session } } = await supabase.auth.getSession()
+    console.log("当前session状态:", session)
     
-    // 创建超时Promise
-    const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('登录请求超时')), 10000)
-    })
+    if (session) {
+      console.log("发现旧session，正在清理...")
+      await supabase.auth.signOut()
+      clearAllAuthCache() // 使用统一的缓存清理函数
+      console.log("session清理完毕")
+    }
 
-    // 登录Promise
-    const loginPromise = supabase.auth.signInWithPassword({
+    console.log("开始登录")
+    const { data: { user }, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     })
-
-    // 使用Promise.race来处理超时
-    const result = await Promise.race([loginPromise, timeoutPromise])
-      .catch(error => {
-        console.error('登录过程出错:', error)
-        throw error
-      })
-
-    // 类型断言，因为我们知道result来自loginPromise
-    const { data: { user }, error } = result as Awaited<typeof loginPromise>
+    console.log("登录请求完成")
     
     if (error) {
       console.error('Sign in error:', error)
@@ -154,8 +148,6 @@ export async function signIn(email: string, password: string) {
     return { user }
   } catch (error) {
     console.error('Sign in error:', error)
-    // 清理可能的损坏状态
-    await supabase.auth.signOut()
     throw error
   }
 }
