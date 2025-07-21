@@ -147,7 +147,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const handleSignOut = async () => {
+    console.log("开始signout")
     await supabase.auth.signOut()
+    console.log("signout成功")
   }
 
   return (

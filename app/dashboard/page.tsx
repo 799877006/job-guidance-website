@@ -213,7 +213,6 @@ export default function DashboardPage() {
 
   const handleSignOut = async () => {
     try {
-      console.log("开始logout")
       await signOut();
       toast({
         title: "ログアウト",
