@@ -59,18 +59,43 @@ interface Booking {
 function LoadingState() {
   return (
     <div className="container mx-auto p-6 space-y-6">
-      <div className="animate-pulse space-y-4">
-        <div className="h-8 bg-gray-200 rounded w-1/3"></div>
-        <div className="h-4 bg-gray-200 rounded w-1/4"></div>
-        <div className="h-[600px] bg-gray-200 rounded"></div>
+      <div className="animate-pulse">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="h-8 bg-gray-200 rounded w-64 mb-2"></div>
+            <div className="h-4 bg-gray-200 rounded w-48"></div>
+          </div>
+          <div className="flex gap-2 items-center">
+            <div className="h-9 w-28 bg-gray-200 rounded"></div>
+            <div className="h-9 w-24 bg-gray-200 rounded"></div>
+            <div className="h-6 w-20 bg-gray-200 rounded-full"></div>
+          </div>
+        </div>
+
+        {/* Stat Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mt-6">
+          <div className="h-28 bg-gray-200 rounded-lg"></div>
+          <div className="h-28 bg-gray-200 rounded-lg"></div>
+          <div className="h-28 bg-gray-200 rounded-lg"></div>
+          <div className="h-28 bg-gray-200 rounded-lg"></div>
+        </div>
+
+        {/* Tabs */}
+        <div className="mt-6 space-y-6">
+          <div className="h-10 w-96 bg-gray-200 rounded"></div>
+          
+          {/* Main Content Area Skeleton */}
+          <div className="h-96 bg-gray-200 rounded-lg"></div>
+        </div>
       </div>
     </div>
-  );
+  )
 }
 
 // 主要内容组件
 function InstructorDashboardContent() {
-  const { user, profile, signOut } = useAuth()
+  const { user, profile, signOut, loading: authLoading } = useAuth()
   const { toast } = useToast()
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -139,6 +164,11 @@ function InstructorDashboardContent() {
   useEffect(() => {
     loadData()
   }, [loadData])
+
+  // 等待认证状态加载完成
+  if (authLoading) {
+    return <LoadingState />
+  }
 
   // 如果用户不是导师，显示提示
   if (profile?.role !== 'instructor') {

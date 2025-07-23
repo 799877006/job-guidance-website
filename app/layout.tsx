@@ -5,6 +5,7 @@ import "./globals.css"
 import { AuthProvider } from "@/components/auth-provider"
 import { Toaster } from "@/components/ui/toaster"
 import { SpeedInsights } from "@vercel/speed-insights/next"
+import ClientOnly from "@/components/client-only"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -14,6 +15,12 @@ export const metadata: Metadata = {
   generator: 'v0.dev'
 }
 
+const LoadingFallback = () => (
+  <div className="min-h-screen flex items-center justify-center">
+    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+  </div>
+)
+
 export default function RootLayout({
   children,
 }: {
@@ -22,10 +29,12 @@ export default function RootLayout({
   return (
     <html lang="ja">
       <body className={inter.className}>
-        <AuthProvider>
-          {children}
-          <Toaster />
-        </AuthProvider>
+        <ClientOnly fallback={<LoadingFallback />}>
+          <AuthProvider>
+            {children}
+            <Toaster />
+          </AuthProvider>
+        </ClientOnly>
       <SpeedInsights />
       </body>
     </html>

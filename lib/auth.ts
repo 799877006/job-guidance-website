@@ -1,4 +1,4 @@
-import { supabase, clearAllAuthCache } from './supabase'
+import { supabase } from './supabase'
 import type { Profile } from './types/supabase'
 
 // 检查是否在浏览器环境中
@@ -115,7 +115,7 @@ export async function createProfile(userId: string) {
 export async function signIn(email: string, password: string) {
   try {
     console.log("开始登录")
-    const { data: { user }, error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     })
@@ -126,13 +126,13 @@ export async function signIn(email: string, password: string) {
       throw error
     }
 
-    if (!user) {
-      console.error('登录成功但未获取到用户信息')
+    if (!data.user || !data.session) {
+      console.error('登录成功但未获取到用户信息或会话')
       throw new Error('ログインに失敗しました')
     }
 
     console.log("signinwithpassword成功")
-    return { user }
+    return data
   } catch (error) {
     console.error('Sign in error:', error)
     throw error
@@ -146,8 +146,7 @@ export async function signOut() {
       console.error('Sign out error, but attempting to clear cache anyway', error)
     }
 
-    // 清除所有认证缓存，确保本地状态被重置
-    clearAllAuthCache()
+    // 在CSR模式下，supabase客户端会自动处理认证缓存清理
 
     // 额外清理任何可能残留的应用特定用户状态
     if (isBrowser) {
@@ -157,8 +156,7 @@ export async function signOut() {
     console.log("Sign out successful and all caches cleared.")
   } catch (error) {
     console.error('Sign out error:', error)
-    // 即使 signOut 失败，也尝试清理缓存
-    clearAllAuthCache()
+    // 在CSR模式下，supabase客户端会自动处理认证缓存清理
     throw error
   }
 }

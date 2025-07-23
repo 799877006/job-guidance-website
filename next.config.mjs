@@ -9,20 +9,8 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  onBuildError(err) {
-    // 忽略特定的错误
-    if (err.message.includes('localStorage is not defined')) {
-      return;
-    }
-    throw err;
-  },
-  // 忽略特定的构建警告
-  onWarning(warning) {
-    if (warning.message.includes('localStorage is not defined')) {
-      return;
-    }
-    console.warn(warning);
-  }
+  // 禁用服务端预渲染的某些功能
+  output: 'standalone',
 }
 
 export default nextConfig

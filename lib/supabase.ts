@@ -1,67 +1,34 @@
 import { createClient } from '@supabase/supabase-js'
 import type { Database } from './types/supabase'
 
+// 简化配置：直接使用环境变量
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
-// 检查是否在浏览器环境中
-const isBrowser = typeof window !== 'undefined'
-
-// Supabase 客户端配置
-const supabaseConfig = {
+// 客户端配置 - 专注于浏览器环境
+const supabaseOptions = {
   auth: {
     autoRefreshToken: true,
-    persistSession: isBrowser, // 只在浏览器环境中持久化会话
-    detectSessionInUrl: isBrowser // 只在浏览器环境中检测URL中的会话
-  }
+    persistSession: true,
+    detectSessionInUrl: false,
+    // 使用默认的localStorage，简化配置
+  },
 }
 
-// 创建 Supabase 客户端实例
-export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, supabaseConfig)
+// 创建单一的Supabase客户端实例
+export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, supabaseOptions)
 
-// 清除所有认证相关的缓存
-export const clearAllAuthCache = () => {
-  if (!isBrowser) return
-
-  // 清理 Supabase 使用的标准 localStorage 键
-  // Supabase 客户端会自动处理这些键，但为了确保完全清理，我们手动操作
-  for (const key in localStorage) {
-    if (key.startsWith('sb-') || key.startsWith('supabase.')) {
-      localStorage.removeItem(key)
-    }
+// 添加网络请求测试函数
+export async function testSupabaseConnection() {
+  try {
+    console.log('🔍 测试 Supabase 连接...')
+    const { data, error } = await supabase.auth.getSession()
+    console.log('✅ Supabase Auth 连接正常:', data)
+    return { success: true, data, error }
+  } catch (error) {
+    console.error('❌ Supabase 连接失败:', error)
+    return { success: false, error }
   }
-  // 额外清理我们之前可能使用的自定义键
-  localStorage.removeItem('job_guidance_student.auth.token')
-  localStorage.removeItem('job_guidance_instructor.auth.token')
-  localStorage.removeItem('job_guidance_admin.auth.token')
-  localStorage.removeItem('job_guidance_default.auth.token')
-}
-
-export type { Database } from './types/supabase'
-
-// Client-side Supabase client (singleton pattern)
-let supabaseClient: ReturnType<typeof createClient<Database>> | null = null
-
-export const getSupabaseBrowserClient = () => {
-  if (!isBrowser) {
-    throw new Error('getSupabaseBrowserClient should only be called in browser environment')
-  }
-
-  if (!supabaseClient) {
-    supabaseClient = createClient<Database>(supabaseUrl, supabaseAnonKey, supabaseConfig)
-  }
-  return supabaseClient
-}
-
-// Server-side Supabase client
-export function createServerClient() {
-  return createClient<Database>(supabaseUrl, supabaseAnonKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-      detectSessionInUrl: false
-    }
-  })
 }
 
 // Types

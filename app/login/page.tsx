@@ -29,27 +29,33 @@ export default function LoginPage() {
     setError("")
 
     try {
-      const result = await signIn(email, password)
-      console.log("登录结果:", result)
+      const { user, session } = await signIn(email, password)
       
-      if (!result?.user) {
-        throw new Error("登录失败：未获取到用户信息")
+      if (!user || !session) {
+        throw new Error("ログインに失敗しました：ユーザー情報が不完全です。")
       }
+      
+      // 手动设置会话，确保后续请求使用新的token
+      await supabase.auth.setSession({
+        access_token: session.access_token,
+        refresh_token: session.refresh_token,
+      })
 
       // 获取用户角色
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('role')
-        .eq('id', result.user.id)
+        .eq('id', user.id)
         .single()
+
 
       if (profileError) {
         console.error("获取用户角色失败:", profileError)
-        throw new Error("登录失败：获取用户角色时出错")
+        throw new Error("ログイン失敗：ユーザー情報の取得中にエラーが発生しました。")
       }
 
       if (!profile) {
-        throw new Error("登录失败：未获取到用户角色信息")
+        throw new Error("ログイン失敗：ユーザー役割情報を取得できませんでした。")
       }
 
       toast({
@@ -57,11 +63,10 @@ export default function LoginPage() {
         description: "ダッシュボードにリダイレクトしています...",
       })
 
-      // 根据用户角色跳转到不同的仪表板
       const redirectPath = profile.role === 'instructor' ? '/instructor-dashboard' : '/dashboard'
       router.push(redirectPath)
+
     } catch (err: any) {
-      console.error("登录错误:", err)
       setError(err.message || "ログインに失敗しました")
     } finally {
       setLoading(false)

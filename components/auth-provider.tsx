@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { createContext, useContext, useEffect, useState } from "react"
 import type { User, AuthChangeEvent } from "@supabase/supabase-js"
 import { supabase } from "@/lib/supabase"
@@ -41,110 +40,65 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   useEffect(() => {
-    let mounted = true
+    // 首次加载时，尝试获取会话
+    const initializeSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setUser(session?.user ?? null);
+      setLoading(false);
+    };
 
-    // Get initial session
-    const initializeAuth = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession()
-        
-        if (!mounted) return
-        
-        setUser(session?.user ?? null)
-        
-        if (session?.user) {
-          // 只在非注册页面获取 profile
-          const currentPath = window.location.pathname
-          if (currentPath !== '/register') {
-            try {
-              const profileData = await getProfile(session.user.id)
-              if (mounted) {
-                setProfile(profileData)
-              }
-            } catch (error) {
-              console.error("获取 profile 失败:", error)
-              if (mounted) {
-                setProfile(null)
-              }
-            }
-          }
-        } else {
-          setProfile(null)
-        }
-        
-        if (mounted) {
-          setLoading(false)
-        }
-      } catch (error) {
-        console.error("初始化认证状态失败:", error)
-        if (mounted) {
-          setUser(null)
-          setProfile(null)
-          setLoading(false)
-        }
-      }
-    }
+    initializeSession();
 
-    initializeAuth()
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event: AuthChangeEvent, session) => {
-      if (!mounted) return
-
-      console.log('Auth state changed:', event, session); // 添加调试日志
-
-      setUser(session?.user ?? null)
-      
-      if (session?.user) {
-        // 检查是否有待创建的 profile
-        const pendingProfile = localStorage.getItem('pendingProfile');
-        
-        if (event === 'SIGNED_IN' && pendingProfile) {
-          try {
-            // 创建 profile
-            await createProfile(session.user.id);
-            // 获取新创建的 profile
-            const profileData = await getProfile(session.user.id);
-            if (mounted) {
-              setProfile(profileData);
-              setLoading(false);
-            }
-          } catch (error) {
-            console.error("创建 profile 失败:", error);
-            // 清除暂存数据以防止重复尝试
-            localStorage.removeItem('pendingProfile');
-            if (mounted) {
-              setProfile(null);
-              setLoading(false);
-            }
-          }
-        } else {
-          // 获取用户资料
-          try {
-            const profileData = await getProfile(session.user.id)
-            if (mounted) {
-              setProfile(profileData)
-              setLoading(false)
-            }
-          } catch (error) {
-            console.error("获取 profile 失败:", error)
-            if (mounted) {
-              setProfile(null)
-              setLoading(false)
-            }
-          }
-        }
-      } else {
-        setProfile(null)
-        setLoading(false)
-      }
-    })
+    // 监听认证状态变化
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      // 这个回调函数应该是快速和同步的
+      setUser(session?.user ?? null);
+      setLoading(false);
+    });
 
     return () => {
-      mounted = false
-      subscription.unsubscribe()
+      subscription?.unsubscribe();
+    };
+  }, []);
+
+  // 当 user 状态变化时，获取 profile
+  useEffect(() => {
+    // 如果 user 存在，则获取 profile
+    if (user) {
+      setLoading(true);
+      // 检查是否有待创建的 profile (注册流程)
+      const pendingProfile = localStorage.getItem('pendingProfile');
+      if (pendingProfile && JSON.parse(pendingProfile).id === user.id) {
+         createProfile(user.id)
+          .then(() => getProfile(user.id))
+          .then(profileData => {
+            setProfile(profileData);
+            localStorage.removeItem('pendingProfile');
+          })
+          .catch(error => {
+            console.error("创建或获取 profile 失败:", error);
+            setProfile(null);
+            localStorage.removeItem('pendingProfile');
+          })
+          .finally(() => setLoading(false));
+      } else {
+        // 普通登录流程
+        getProfile(user.id)
+          .then(profileData => {
+            setProfile(profileData);
+          })
+          .catch(error => {
+            console.error("获取 profile 失败:", error);
+            setProfile(null);
+          })
+          .finally(() => setLoading(false));
+      }
+    } else {
+      // 如果 user 为 null，则清除 profile
+      setProfile(null);
     }
-  }, [])
+  }, [user]);
+
 
   const handleSignOut = async () => {
     console.log("开始signout")
