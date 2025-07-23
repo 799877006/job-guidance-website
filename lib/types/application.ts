@@ -24,10 +24,12 @@ export interface Application {
   offer_received_at: string | null;
   created_at: string;
   updated_at: string;
-  // 新增面试相关字段
-  interview_location?: string | null;
-  interview_notes?: string | null;
-  interview_status?: InterviewStatus;
+  annual_salary: number | null;
+  monthly_salary: number | null;
+  benefits: string[];
+  location: string | null;
+  work_hours: string | null;
+  other_conditions: string | null;
 }
 
 export interface ApplicationWithDetails extends Application {

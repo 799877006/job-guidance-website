@@ -4,10 +4,7 @@ import type { Application, ApplicationDetails, ApplicationStatus } from './types
 export async function getApplications() {
   const { data, error } = await supabase
     .from('applications')
-    .select(`
-      *,
-      details:application_details(*)
-    `)
+    .select('*')
     .order('applied_at', { ascending: false });
 
   if (error) throw error;
@@ -46,13 +43,14 @@ export async function createApplication(application: Omit<Application, 'id' | 'u
   return data;
 }
 
-export async function updateApplication(id: string, application: Partial<Application>) {
+export async function updateApplication(
+  id: string,
+  updates: Partial<Application>
+) {
   const { data, error } = await supabase
     .from('applications')
-    .update(application)
-    .eq('id', id)
-    .select()
-    .single();
+    .update(updates)
+    .eq('id', id);
 
   if (error) throw error;
   return data;

@@ -318,18 +318,51 @@ function ApplicationsContent() {
   };
 
   const handleOpenDetailsDialog = (app: ApplicationWithDetails) => {
-    setSelectedApp(app);
+    // 用最新的 applications 查找
+    const latestApp = applications.find(a => a.id === app.id) || app;
+    setSelectedApp(latestApp);
     setInterviewTimes({
-      first_interview_start: formatDateTime(app.first_interview_at),
+      first_interview_start: formatDateTime(latestApp.first_interview_at),
       first_interview_end: '', // 待实现
-      second_interview_start: formatDateTime(app.second_interview_at),
+      second_interview_start: formatDateTime(latestApp.second_interview_at),
       second_interview_end: '', // 待实现
-      final_interview_start: formatDateTime(app.final_interview_at),
+      final_interview_start: formatDateTime(latestApp.final_interview_at),
       final_interview_end: '', // 待实现
-      offer_received_at: formatDateTime(app.offer_received_at),
+      offer_received_at: formatDateTime(latestApp.offer_received_at),
     });
     setIsDetailsDialogOpen(true);
   }
+
+  // 新增：保存内定信息的函数
+  const handleOfferDetailsSave = async (
+    app: ApplicationWithDetails,
+    formData: FormData,
+    closeDialog: () => void
+  ) => {
+    try {
+      await updateApplication(app.id, {
+        annual_salary: Number(formData.get('annual_salary')),
+        monthly_salary: Number(formData.get('monthly_salary')),
+        location: formData.get('location') as string,
+        work_hours: formData.get('work_hours') as string,
+        other_conditions: formData.get('other_conditions') as string,
+      });
+
+      await loadApplications();
+      closeDialog(); // 关闭弹窗
+      toast({
+        title: "保存完了",
+        description: "内定情報が保存されました。",
+      });
+    } catch (error) {
+      console.error('Failed to update offer details:', error);
+      toast({
+        title: "エラー",
+        description: "内定情報の保存に失敗しました",
+        variant: "destructive",
+      });
+    }
+  };
 
 
   return (
@@ -490,30 +523,7 @@ function ApplicationsContent() {
                             const form = e.target as HTMLFormElement;
                             const formData = new FormData(form);
                             
-                            try {
-                              if (app.details?.id) {
-                                await updateApplicationDetails(app.details.id, {
-                                  annual_salary: Number(formData.get('annual_salary')),
-                                  monthly_salary: Number(formData.get('monthly_salary')),
-                                  location: formData.get('location') as string,
-                                  work_hours: formData.get('work_hours') as string,
-                                  other_conditions: formData.get('other_conditions') as string,
-                                });
-                              } else {
-                                await createApplicationDetails({
-                                  application_id: app.id,
-                                  annual_salary: Number(formData.get('annual_salary')),
-                                  monthly_salary: Number(formData.get('monthly_salary')),
-                                  benefits: [],
-                                  location: formData.get('location') as string,
-                                  work_hours: formData.get('work_hours') as string,
-                                  other_conditions: formData.get('other_conditions') as string,
-                                });
-                              }
-                              loadApplications();
-                            } catch (error) {
-                              console.error('Failed to update offer details:', error);
-                            }
+                            await handleOfferDetailsSave(app, formData, () => setIsDetailsDialogOpen(false));
                           }}>
                             <div className="grid grid-cols-2 gap-4">
                               <div>
@@ -522,7 +532,7 @@ function ApplicationsContent() {
                                   id="annual_salary"
                                   name="annual_salary"
                                   type="number"
-                                  defaultValue={app.details?.annual_salary || ''}
+                                  defaultValue={app.annual_salary || ''}
                                 />
                               </div>
                               <div>
@@ -531,7 +541,7 @@ function ApplicationsContent() {
                                   id="monthly_salary"
                                   name="monthly_salary"
                                   type="number"
-                                  defaultValue={app.details?.monthly_salary || ''}
+                                  defaultValue={app.monthly_salary || ''}
                                 />
                               </div>
                             </div>
@@ -540,7 +550,7 @@ function ApplicationsContent() {
                               <Input
                                 id="location"
                                 name="location"
-                                defaultValue={app.details?.location || ''}
+                                defaultValue={app.location || ''}
                               />
                             </div>
                             <div>
@@ -548,7 +558,7 @@ function ApplicationsContent() {
                               <Input
                                 id="work_hours"
                                 name="work_hours"
-                                defaultValue={app.details?.work_hours || ''}
+                                defaultValue={app.work_hours || ''}
                               />
                             </div>
                             <div>
@@ -556,7 +566,7 @@ function ApplicationsContent() {
                               <Input
                                 id="other_conditions"
                                 name="other_conditions"
-                                defaultValue={app.details?.other_conditions || ''}
+                                defaultValue={app.other_conditions || ''}
                               />
                             </div>
                             <Button type="submit">保存</Button>

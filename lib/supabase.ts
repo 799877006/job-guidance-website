@@ -18,19 +18,6 @@ const supabaseOptions = {
 // 创建单一的Supabase客户端实例
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, supabaseOptions)
 
-// 添加网络请求测试函数
-export async function testSupabaseConnection() {
-  try {
-    console.log('🔍 测试 Supabase 连接...')
-    const { data, error } = await supabase.auth.getSession()
-    console.log('✅ Supabase Auth 连接正常:', data)
-    return { success: true, data, error }
-  } catch (error) {
-    console.error('❌ Supabase 连接失败:', error)
-    return { success: false, error }
-  }
-}
-
 // Types
 export interface Profile {
   id: string
