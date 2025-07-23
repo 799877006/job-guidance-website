@@ -27,6 +27,17 @@ function ApplicationsContent() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [interviewTimes, setInterviewTimes] = useState({
+    first_interview_start: '',
+    first_interview_end: '',
+    second_interview_start: '',
+    second_interview_end: '',
+    final_interview_start: '',
+    final_interview_end: '',
+    offer_received_at: '',
+  });
+
+  const today_string = format(new Date(), "yyyy-MM-dd'T'HH:mm");
 
   useEffect(() => {
     loadApplications();
@@ -149,12 +160,110 @@ function ApplicationsContent() {
     }
   };
 
+  // 修改面试日期处理函数（只更新本地状态）
+  const handleLocalInterviewDateChange = (
+    interviewType: '一次' | '二次' | '最終' | '内定',
+    dateValue: string | null,
+    timeField: 'start' | 'end'
+  ) => {
+    const interviewTypeToKeyMap = {
+      '一次': 'first',
+      '二次': 'second',
+      '最終': 'final',
+    };
+
+    const newTimes = { ...interviewTimes };
+    let fieldKey: keyof typeof interviewTimes;
+
+    if (interviewType === '内定') {
+      fieldKey = 'offer_received_at';
+      newTimes[fieldKey] = dateValue || '';
+    } else {
+      const keyPrefix = interviewTypeToKeyMap[interviewType as keyof typeof interviewTypeToKeyMap];
+      fieldKey = `${keyPrefix}_interview_${timeField}` as keyof typeof interviewTimes;
+      newTimes[fieldKey] = dateValue || '';
+    }
+    setInterviewTimes(newTimes);
+  }
+
+  // 保存所有日程变更
+  const handleSaveChanges = async () => {
+    if (!selectedApp || isSubmitting) return;
+
+    setIsSubmitting(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('認証が必要です');
+      
+      const app = selectedApp;
+      const updates: Partial<ApplicationWithDetails> = {};
+      
+      const interviewTypesToProcess = [
+        { type: '一次' as const, key: 'first' as const },
+        { type: '二次' as const, key: 'second' as const },
+        { type: '最終' as const, key: 'final' as const },
+      ];
+
+      for (const it of interviewTypesToProcess) {
+        const startKey = `${it.key}_interview_start` as keyof typeof interviewTimes;
+        const endKey = `${it.key}_interview_end` as keyof typeof interviewTimes;
+        
+        const startTime = interviewTimes[startKey];
+        const endTime = interviewTimes[endKey];
+        
+        if (startTime) {
+          const utcStartTime = toUTCDateTime(startTime);
+          updates[`${it.key}_interview_at`] = utcStartTime;
+          await syncInterviewToSchedule(user.id, app.company_name, utcStartTime, it.type, toUTCDateTime(endTime));
+        } else {
+          updates[`${it.key}_interview_at`] = null;
+        }
+      }
+
+      // 处理内定日
+      if (interviewTimes.offer_received_at) {
+        updates.offer_received_at = toUTCDateTime(interviewTimes.offer_received_at);
+      } else {
+        updates.offer_received_at = null;
+      }
+      
+      // 根据最新的日程更新状态
+      if (updates.final_interview_at) updates.status = '最終面接待ち';
+      else if (updates.second_interview_at) updates.status = '二次面接待ち';
+      else if (updates.first_interview_at) updates.status = '一次面接待ち';
+      else updates.status = '書類選考中';
+
+
+      if (Object.keys(updates).length > 0) {
+        await updateApplication(app.id, updates);
+      }
+
+      await loadApplications();
+      toast({
+        title: "保存完了",
+        description: "日程の変更が正常に保存されました。",
+      });
+      setIsDetailsDialogOpen(false);
+
+    } catch (error) {
+       console.error('Failed to save changes:', error);
+      toast({
+        title: "エラー",
+        description: "変更の保存に失敗しました",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
   // 同步面试日程到日程表
   const syncInterviewToSchedule = async (
     userId: string,
     companyName: string,
     interviewDate: string | null,
-    interviewType: '一次' | '二次' | '最終'
+    interviewType: '一次' | '二次' | '最終',
+    interviewEndDate?: string | null
   ) => {
     try {
       if (!interviewDate) {
@@ -163,12 +272,36 @@ function ApplicationsContent() {
       }
 
       // 准备日程数据
-      const parsedDate = parseISO(interviewDate);
+      const parsedStartDate = parseISO(interviewDate);
+      let parsedEndDate;
+
+      if (interviewEndDate) {
+        // 如果提供了结束时间，则使用它
+        const tempEndDate = new Date(interviewEndDate);
+        // 确保结束日期和开始日期是同一天，避免用户错误输入
+        tempEndDate.setFullYear(parsedStartDate.getFullYear(), parsedStartDate.getMonth(), parsedStartDate.getDate());
+        parsedEndDate = tempEndDate;
+
+        // 如果结束时间早于开始时间，则设置为开始时间+30分钟
+        if (parsedEndDate.getTime() < parsedStartDate.getTime()) {
+           parsedEndDate = new Date(parsedStartDate.getTime() + 30 * 60 * 1000);
+        }
+      } else {
+        // 如果没有提供结束时间，则默认为开始时间+30分钟
+        parsedEndDate = new Date(parsedStartDate.getTime() + 30 * 60 * 1000);
+      }
+      
+      // 再次检查跨天问题
+      if (parsedEndDate.getDate() !== parsedStartDate.getDate()) {
+        parsedEndDate.setHours(23, 59, 59, 999);
+      }
+
+
       const scheduleData = {
         student_id: userId,
-        date: format(parsedDate, 'yyyy-MM-dd'),
-        start_time: format(parsedDate, 'HH:mm'),
-        end_time: format(new Date(parsedDate.getTime() + 60 * 60 * 1000), 'HH:mm'), // 默认1小时
+        date: format(parsedStartDate, 'yyyy-MM-dd'),
+        start_time: format(parsedStartDate, 'HH:mm'),
+        end_time: format(parsedEndDate, 'HH:mm'),
         schedule_type: 'interview' as const,
         title: `${companyName} - ${interviewType}面接`,
         description: `${companyName}の${interviewType}面接`,
@@ -184,70 +317,20 @@ function ApplicationsContent() {
     }
   };
 
-  // 修改面试日期处理函数
-  const handleInterviewDateChange = async (
-    appId: string,
-    interviewType: '一次' | '二次' | '最終',
-    dateValue: string | null,
-    companyName: string
-  ) => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('認証が必要です');
+  const handleOpenDetailsDialog = (app: ApplicationWithDetails) => {
+    setSelectedApp(app);
+    setInterviewTimes({
+      first_interview_start: formatDateTime(app.first_interview_at),
+      first_interview_end: '', // 待实现
+      second_interview_start: formatDateTime(app.second_interview_at),
+      second_interview_end: '', // 待实现
+      final_interview_start: formatDateTime(app.final_interview_at),
+      final_interview_end: '', // 待实现
+      offer_received_at: formatDateTime(app.offer_received_at),
+    });
+    setIsDetailsDialogOpen(true);
+  }
 
-      console.log('Handling interview date change:', {
-        appId,
-        interviewType,
-        dateValue,
-        companyName
-      });
-
-      const updateData: any = {};
-      const utcDate = dateValue ? toUTCDateTime(dateValue) : null;
-
-      // 更新面试日期和状态
-      switch (interviewType) {
-        case '一次':
-          updateData.first_interview_at = utcDate;
-          updateData.status = utcDate ? '一次面接待ち' : '書類選考中';
-          break;
-        case '二次':
-          updateData.second_interview_at = utcDate;
-          updateData.status = utcDate ? '二次面接待ち' : '一次面接完了';
-          break;
-        case '最終':
-          updateData.final_interview_at = utcDate;
-          updateData.status = utcDate ? '最終面接待ち' : '二次面接完了';
-          break;
-      }
-
-      console.log('Updating application with:', updateData);
-
-      // 更新应聘记录
-      await updateApplication(appId, updateData);
-      
-      // 同步到日程表
-      await syncInterviewToSchedule(
-        user.id,
-        companyName,
-        utcDate,
-        interviewType
-      );
-
-      await loadApplications();
-      toast({
-        title: "更新完了",
-        description: dateValue ? "面接日程を設定しました" : "面接日程をキャンセルしました",
-      });
-    } catch (error) {
-      console.error('Failed to update interview date:', error);
-      toast({
-        title: "エラー",
-        description: "面接日程の更新に失敗しました",
-        variant: "destructive",
-      });
-    }
-  };
 
   return (
     <div className="container mx-auto py-8">
@@ -324,11 +407,10 @@ function ApplicationsContent() {
                 <TableCell>
                   <Dialog open={isDetailsDialogOpen && selectedApp?.id === app.id} onOpenChange={(open) => {
                     setIsDetailsDialogOpen(open);
-                    if (open) setSelectedApp(app);
-                    else setSelectedApp(null);
+                    if (!open) setSelectedApp(null);
                   }}>
                     <DialogTrigger asChild>
-                      <Button variant="outline" size="sm">
+                      <Button variant="outline" size="sm" onClick={() => handleOpenDetailsDialog(app)}>
                         詳細
                       </Button>
                     </DialogTrigger>
@@ -337,74 +419,73 @@ function ApplicationsContent() {
                         <DialogTitle>{app.company_name} - 詳細情報</DialogTitle>
                       </DialogHeader>
                       <div className="space-y-4">
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <Label>一次面接日</Label>
+                        <div>
+                          <Label>一次面接日</Label>
+                          <div className="grid grid-cols-2 gap-2">
                             <Input
                               type="datetime-local"
-                              value={formatDateTime(app.first_interview_at)}
-                              onChange={async (e) => {
-                                await handleInterviewDateChange(
-                                  app.id,
-                                  '一次',
-                                  e.target.value,
-                                  app.company_name
-                                );
-                              }}
+                              min={today_string}
+                              value={interviewTimes.first_interview_start}
+                              onChange={(e) => handleLocalInterviewDateChange('一次', e.target.value, 'start')}
                             />
-                          </div>
-                          <div>
-                            <Label>二次面接日</Label>
                             <Input
                               type="datetime-local"
-                              value={formatDateTime(app.second_interview_at)}
-                              onChange={async (e) => {
-                                await handleInterviewDateChange(
-                                  app.id,
-                                  '二次',
-                                  e.target.value,
-                                  app.company_name
-                                );
-                              }}
+                              min={interviewTimes.first_interview_start || today_string}
+                              value={interviewTimes.first_interview_end}
+                              onChange={(e) => handleLocalInterviewDateChange('一次', e.target.value, 'end')}
                             />
                           </div>
                         </div>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <Label>最終面接日</Label>
+                        <div>
+                          <Label>二次面接日</Label>
+                          <div className="grid grid-cols-2 gap-2">
                             <Input
                               type="datetime-local"
-                              value={formatDateTime(app.final_interview_at)}
-                              onChange={async (e) => {
-                                await handleInterviewDateChange(
-                                  app.id,
-                                  '最終',
-                                  e.target.value,
-                                  app.company_name
-                                );
-                              }}
+                              min={today_string}
+                              value={interviewTimes.second_interview_start}
+                              onChange={(e) => handleLocalInterviewDateChange('二次', e.target.value, 'start')}
                             />
-                          </div>
-                          <div>
-                            <Label>内定日</Label>
                             <Input
                               type="datetime-local"
-                              value={formatDateTime(app.offer_received_at)}
-                              onChange={async (e) => {
-                                try {
-                                  await updateApplication(app.id, {
-                                    offer_received_at: toUTCDateTime(e.target.value)
-                                  });
-                                  loadApplications();
-                                } catch (error) {
-                                  console.error('Failed to update offer date:', error);
-                                }
-                              }}
+                              min={interviewTimes.second_interview_start || today_string}
+                              value={interviewTimes.second_interview_end}
+                              onChange={(e) => handleLocalInterviewDateChange('二次', e.target.value, 'end')}
                             />
                           </div>
                         </div>
+                        <div>
+                          <Label>最終面接日</Label>
+                          <div className="grid grid-cols-2 gap-2">
+                            <Input
+                              type="datetime-local"
+                              min={today_string}
+                              value={interviewTimes.final_interview_start}
+                              onChange={(e) => handleLocalInterviewDateChange('最終', e.target.value, 'start')}
+                            />
+                            <Input
+                              type="datetime-local"
+                              min={interviewTimes.final_interview_start || today_string}
+                              value={interviewTimes.final_interview_end}
+                              onChange={(e) => handleLocalInterviewDateChange('最終', e.target.value, 'end')}
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <Label>内定日</Label>
+                          <Input
+                            type="datetime-local"
+                            min={today_string}
+                            value={interviewTimes.offer_received_at}
+                            onChange={(e) => handleLocalInterviewDateChange('内定', e.target.value, 'start')}
+                          />
+                        </div>
+                        
+                        <Button onClick={handleSaveChanges} disabled={isSubmitting}>
+                          {isSubmitting ? '保存中...' : '日程を保存'}
+                        </Button>
+
                         {app.status === '内定' && (
-                          <form className="space-y-4" onSubmit={async (e) => {
+                          <form className="space-y-4 pt-4 border-t" onSubmit={async (e) => {
                             e.preventDefault();
                             const form = e.target as HTMLFormElement;
                             const formData = new FormData(form);

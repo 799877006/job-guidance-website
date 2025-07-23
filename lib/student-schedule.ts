@@ -1,6 +1,6 @@
 import { supabase } from './supabase'
 
-export type ScheduleType = 'free' | 'busy' | 'class' | 'interview' | 'other'
+export type ScheduleType = 'free' | 'busy' | 'class' | 'interview' | 'other' | 'mentoring'
 
 export interface StudentSchedule {
   id: string
@@ -229,38 +229,49 @@ function getTimeDifferenceInMinutes(startTime: string, endTime: string): number 
 
 // 获取时间类型的显示配置
 export function getScheduleTypeConfig(type: ScheduleType) {
-  const configs = {
-    free: {
-      label: '空き時間',
-      color: '#10b981', // green-500
-      bgColor: '#d1fae5', // green-100
-      textColor: '#064e3b' // green-900
-    },
-    busy: {
-      label: '忙しい',
-      color: '#ef4444', // red-500
-      bgColor: '#fee2e2', // red-100
-      textColor: '#7f1d1d' // red-900
-    },
-    class: {
-      label: '授業',
-      color: '#3b82f6', // blue-500
-      bgColor: '#dbeafe', // blue-100
-      textColor: '#1e3a8a' // blue-900
-    },
-    interview: {
-      label: '面接',
-      color: '#8b5cf6', // violet-500
-      bgColor: '#ede9fe', // violet-100
-      textColor: '#4c1d95' // violet-900
-    },
-    other: {
-      label: 'その他',
-      color: '#6b7280', // gray-500
-      bgColor: '#f3f4f6', // gray-100
-      textColor: '#1f2937' // gray-800
-    }
+  switch (type) {
+    case 'free':
+      return {
+        label: '空き時間',
+        color: '#10b981',
+        bgColor: '#d1fae5',
+        textColor: '#065f46',
+      }
+    case 'busy':
+      return {
+        label: '忙しい',
+        color: '#ef4444',
+        bgColor: '#fee2e2',
+        textColor: '#991b1b',
+      }
+    case 'class':
+      return {
+        label: '授業',
+        color: '#f59e42',
+        bgColor: '#fef3c7',
+        textColor: '#92400e',
+      }
+    case 'interview':
+      return {
+        label: '面接',
+        color: '#a78bfa',
+        bgColor: '#ede9fe',
+        textColor: '#5b21b6',
+      }
+    case 'mentoring': // 新增辅导预约类型
+      return {
+        label: '面接辅导',
+        color: '#3b82f6',
+        bgColor: '#dbeafe',
+        textColor: '#1e40af',
+      }
+    case 'other':
+    default:
+      return {
+        label: 'その他',
+        color: '#6b7280',
+        bgColor: '#f3f4f6',
+        textColor: '#374151',
+      }
   }
-  
-  return configs[type] || configs.other
 } 

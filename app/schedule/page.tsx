@@ -88,111 +88,35 @@ function StudentScheduleContent() {
       const startDate = format(startOfWeek(selectedDate, { weekStartsOn: 0 }), 'yyyy-MM-dd')
       const endDate = format(endOfWeek(selectedDate, { weekStartsOn: 0 }), 'yyyy-MM-dd')
 
-      // 获取所有日程（包括面试日程）
+      // 获取 student_schedule 表中的所有日程
       const schedule = await getStudentSchedule(user.id, startDate, endDate)
-      
-      // 获取应聘记录中的面试日程
-      const { data: applications } = await supabase
-        .from("applications")
-        .select(`
-          id,
-          company_name,
-          first_interview_at,
-          second_interview_at,
-          final_interview_at,
-          created_at,
-          updated_at,
-          user_id,
-          status,
-          interview_location,
-          interview_notes,
-          interview_status
-        `)
-        .eq("user_id", user.id)
-        .or(
-          `and(first_interview_at.gte.${startDate},first_interview_at.lte.${endDate}),` +
-          `and(second_interview_at.gte.${startDate},second_interview_at.lte.${endDate}),` +
-          `and(final_interview_at.gte.${startDate},final_interview_at.lte.${endDate})`
-        )
 
-      console.log('Found applications:', applications); // 添加调试日志
+      // 获取 mentoring_bookings 表中的所有预约
+      const { data: mentoringBookings } = await supabase
+        .from('mentoring_bookings')
+        .select('*')
+        .eq('student_id', user.id)
+        .gte('date', startDate)
+        .lte('date', endDate)
 
-      // 合并所有日程
-      let allSchedules = [...(schedule || [])]
+      // 合并日程和预约
+      const combinedSchedule = [
+        ...(schedule || []),
+        ...(mentoringBookings?.map(booking => ({
+          id: booking.id,
+          date: booking.date,
+          start_time: booking.start_time,
+          end_time: booking.end_time,
+          schedule_type: 'mentoring',
+          title: booking.subject,
+          description: booking.description,
+          location: '',
+          color: '#3b82f6' // 使用蓝色表示辅导预约
+        })) || [])
+      ]
 
-      // 添加应聘记录中的面试日程
-      if (applications) {
-        applications.forEach(app => {
-          // 处理一次面试
-          if (app.first_interview_at) {
-            const date = parseISO(app.first_interview_at)
-            if (date >= parseISO(startDate) && date <= parseISO(endDate)) {
-              allSchedules.push({
-                id: `first_${app.id}`,
-                student_id: user.id,
-                date: format(date, 'yyyy-MM-dd'),
-                start_time: format(date, 'HH:mm'),
-                end_time: format(new Date(date.getTime() + 60 * 60 * 1000), 'HH:mm'),
-                schedule_type: 'interview',
-                title: `${app.company_name} - 一次面接`,
-                description: app.interview_notes || `${app.company_name}の一次面接`,
-                color: '#3b82f6',
-                created_at: app.created_at,
-                updated_at: app.updated_at,
-                location: app.interview_location || ''
-              })
-            }
-          }
-
-          // 处理二次面试
-          if (app.second_interview_at) {
-            const date = parseISO(app.second_interview_at)
-            if (date >= parseISO(startDate) && date <= parseISO(endDate)) {
-              allSchedules.push({
-                id: `second_${app.id}`,
-                student_id: user.id,
-                date: format(date, 'yyyy-MM-dd'),
-                start_time: format(date, 'HH:mm'),
-                end_time: format(new Date(date.getTime() + 60 * 60 * 1000), 'HH:mm'),
-                schedule_type: 'interview',
-                title: `${app.company_name} - 二次面接`,
-                description: app.interview_notes || `${app.company_name}の二次面接`,
-                color: '#3b82f6',
-                created_at: app.created_at,
-                updated_at: app.updated_at,
-                location: app.interview_location || ''
-              })
-            }
-          }
-
-          // 处理最终面试
-          if (app.final_interview_at) {
-            const date = parseISO(app.final_interview_at)
-            if (date >= parseISO(startDate) && date <= parseISO(endDate)) {
-              allSchedules.push({
-                id: `final_${app.id}`,
-                student_id: user.id,
-                date: format(date, 'yyyy-MM-dd'),
-                start_time: format(date, 'HH:mm'),
-                end_time: format(new Date(date.getTime() + 60 * 60 * 1000), 'HH:mm'),
-                schedule_type: 'interview',
-                title: `${app.company_name} - 最終面接`,
-                description: app.interview_notes || `${app.company_name}の最終面接`,
-                color: '#3b82f6',
-                created_at: app.created_at,
-                updated_at: app.updated_at,
-                location: app.interview_location || ''
-              })
-            }
-          }
-        })
-      }
-
-      console.log('All schedules:', allSchedules); // 添加调试日志
-
-      // 更新状态
-      setMySchedule(allSchedules)
-      setInterviews([]) // 不再需要单独的面试数据
+      setMySchedule(combinedSchedule)
+      setInterviews([])
     } catch (error) {
       console.error('Error loading data:', error)
       toast({
@@ -515,6 +439,7 @@ function StudentScheduleContent() {
   const renderScheduleItem = (schedule: StudentSchedule) => {
     const config = getScheduleTypeConfig(schedule.schedule_type);
     const isInterview = schedule.id.match(/^(first|second|final)_(.+)$/);
+    const isMentoring = schedule.schedule_type === 'mentoring';
     
     return (
       <div 
@@ -558,6 +483,18 @@ function StudentScheduleContent() {
                 <Trash2 className="h-3 w-3" />
               </button>
             </>
+          ) : isMentoring ? (
+            <button
+              className="p-1 rounded bg-blue-100 hover:bg-blue-200 text-blue-600"
+              onClick={(e) => {
+                e.stopPropagation();
+                // 跳转到辅导预约页面
+                window.location.href = `/mentoring`;
+              }}
+              title="辅导予約詳細へ"
+            >
+              <BookOpen className="h-3 w-3" />
+            </button>
           ) : (
             <>
               <button
