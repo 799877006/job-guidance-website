@@ -13,6 +13,7 @@ export interface StudentSchedule {
   description?: string
   location?: string
   color: string
+  application_id?: string | null;
   created_at: string
   updated_at: string
 }

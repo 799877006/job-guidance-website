@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Calendar, Clock, ArrowLeft, Plus, Edit, Trash2, AlertCircle, BookOpen, CheckCircle, Users } from "lucide-react"
@@ -74,6 +75,7 @@ function StudentScheduleContent() {
   const [loading, setLoading] = useState(false)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingSchedule, setEditingSchedule] = useState<StudentSchedule | null>(null)
+  const [pendingDeleteSchedule, setPendingDeleteSchedule] = useState<StudentSchedule | null>(null)
 
   useEffect(() => {
     if (!user?.id) return
@@ -166,11 +168,14 @@ function StudentScheduleContent() {
     setLoading(true)
     try {
       const config = getScheduleTypeConfig(scheduleForm.scheduleType)
+      // 拼接完整的ISO日期时间字符串
+      const startDateTime = `${scheduleForm.date}T${scheduleForm.startTime}:00`;
+      const endDateTime = `${scheduleForm.date}T${scheduleForm.endTime}:00`;
       await createSchedule({
         student_id: user.id,
         date: scheduleForm.date,
-        start_time: scheduleForm.startTime,
-        end_time: scheduleForm.endTime,
+        start_time: startDateTime,
+        end_time: endDateTime,
         schedule_type: scheduleForm.scheduleType,
         title: scheduleForm.title,
         description: scheduleForm.description || undefined,
@@ -201,12 +206,14 @@ function StudentScheduleContent() {
 
     setLoading(true)
     try {
-      // 检查是否是面试日程（ID格式：first_xxx, second_xxx, final_xxx）
-      const isApplicationInterview = editingSchedule.id.match(/^(first|second|final)_(.+)$/);
+      // 判断是否是面试日程（通过 schedule_type 和 application_id）
+      if (editingSchedule.schedule_type === 'interview' && editingSchedule.application_id) {
+        const applicationId = editingSchedule.application_id;
+        let interviewType = '';
+        if (editingSchedule.title.includes('一次')) interviewType = 'first';
+        else if (editingSchedule.title.includes('二次')) interviewType = 'second';
+        else if (editingSchedule.title.includes('最終')) interviewType = 'final';
 
-      if (isApplicationInterview) {
-        const [, interviewType, applicationId] = isApplicationInterview;
-        
         // 构建更新数据
         const updateData: any = {
           interview_location: scheduleForm.location || null,
@@ -214,16 +221,18 @@ function StudentScheduleContent() {
           interview_status: 'scheduled'
         };
 
+        // 拼接完整的ISO日期时间字符串
+        const startDateTime = `${scheduleForm.date}T${scheduleForm.startTime}:00`;
         // 更新对应的面试时间字段
         switch (interviewType) {
           case 'first':
-            updateData.first_interview_at = `${scheduleForm.date}T${scheduleForm.startTime}:00`;
+            updateData.first_interview_at = startDateTime;
             break;
           case 'second':
-            updateData.second_interview_at = `${scheduleForm.date}T${scheduleForm.startTime}:00`;
+            updateData.second_interview_at = startDateTime;
             break;
           case 'final':
-            updateData.final_interview_at = `${scheduleForm.date}T${scheduleForm.startTime}:00`;
+            updateData.final_interview_at = startDateTime;
             break;
         }
 
@@ -242,10 +251,13 @@ function StudentScheduleContent() {
       } else {
         // 普通日程的更新
         const config = getScheduleTypeConfig(scheduleForm.scheduleType)
+        // 拼接完整的ISO日期时间字符串
+        const startDateTime = `${scheduleForm.date}T${scheduleForm.startTime}:00`;
+        const endDateTime = `${scheduleForm.date}T${scheduleForm.endTime}:00`;
         await updateSchedule(editingSchedule.id, {
           date: scheduleForm.date,
-          start_time: scheduleForm.startTime,
-          end_time: scheduleForm.endTime,
+          start_time: startDateTime,
+          end_time: endDateTime,
           schedule_type: scheduleForm.scheduleType,
           title: scheduleForm.title,
           description: scheduleForm.description || undefined,
@@ -274,17 +286,46 @@ function StudentScheduleContent() {
     setLoading(false)
   }
 
-  const handleEditSchedule = (schedule: StudentSchedule) => {
-    // 检查是否是面试日程（ID格式：first_xxx, second_xxx, final_xxx）
-    const isApplicationInterview = schedule.id.match(/^(first|second|final)_(.+)$/);
-    
-    if (isApplicationInterview) {
-      const [, interviewType, applicationId] = isApplicationInterview;
-      
-      // 确认是否要取消面试
-      if (confirm("面接予定を変更または取消しますか？\n\n注意：この操作は応募記録にも影響します。")) {
-        handleDeleteSchedule(schedule.id);
+  const handleEditSchedule = async (schedule: StudentSchedule) => {
+    // 判断是否是面试日程（通过 schedule_type 和 application_id）
+    if (schedule.schedule_type === 'interview' && schedule.application_id) {
+      const applicationId = schedule.application_id;
+      let interviewType = '';
+      if (schedule.title.includes('一次')) interviewType = 'first';
+      else if (schedule.title.includes('二次')) interviewType = 'second';
+      else if (schedule.title.includes('最終')) interviewType = 'final';
+      // 查询 applications 表
+      const { data: app } = await supabase
+        .from('applications')
+        .select('*')
+        .eq('id', applicationId)
+        .single();
+      let startTime = '';
+      let endTime = '';
+      if (app) {
+        if (interviewType === 'first') {
+          startTime = app.first_interview_at ? app.first_interview_at.slice(11, 16) : '';
+          endTime = app.first_interview_end ? app.first_interview_end.slice(11, 16) : '';
+        } else if (interviewType === 'second') {
+          startTime = app.second_interview_at ? app.second_interview_at.slice(11, 16) : '';
+          endTime = app.second_interview_end ? app.second_interview_end.slice(11, 16) : '';
+        } else if (interviewType === 'final') {
+          startTime = app.final_interview_at ? app.final_interview_at.slice(11, 16) : '';
+          endTime = app.final_interview_end ? app.final_interview_end.slice(11, 16) : '';
+        }
       }
+      setEditingSchedule(schedule);
+      setScheduleForm({
+        date: schedule.date,
+        startTime,
+        endTime,
+        scheduleType: schedule.schedule_type,
+        title: schedule.title,
+        description: schedule.description || "",
+        location: schedule.location || "",
+        color: schedule.color
+      });
+      setIsDialogOpen(true);
       return;
     }
 
@@ -324,19 +365,18 @@ function StudentScheduleContent() {
 
   const handleDeleteSchedule = async (scheduleId: string) => {
     try {
-      // 检查是否是面试日程（ID格式：first_xxx, second_xxx, final_xxx）
-      const isApplicationInterview = scheduleId.match(/^(first|second|final)_(.+)$/);
-      
-      if (isApplicationInterview) {
-        const [, interviewType, applicationId] = isApplicationInterview;
-        
-        if (!confirm("面接予定をキャンセルしますか？\n\n注意：この操作は応募記録にも影響します。")) return;
-
+      const schedule = mySchedule.find(s => s.id === scheduleId);
+      if (schedule && schedule.schedule_type === 'interview' && schedule.application_id) {
+        let interviewType = '';
+        if (schedule.title.includes('一次')) interviewType = 'first';
+        else if (schedule.title.includes('二次')) interviewType = 'second';
+        else if (schedule.title.includes('最終')) interviewType = 'final';
+        const applicationId = schedule.application_id;
+        // 不再直接confirm，交由AlertDialog处理
         // 构建更新数据
         const updateData: any = {
           interview_status: 'cancelled'
         };
-        
         switch (interviewType) {
           case 'first':
             updateData.first_interview_at = null;
@@ -351,30 +391,25 @@ function StudentScheduleContent() {
             updateData.status = '二次面接完了';
             break;
         }
-        
         // 更新应聘记录
         const { error: updateError } = await supabase
           .from('applications')
           .update(updateData)
           .eq('id', applicationId);
-
         if (updateError) throw updateError;
-
+        await deleteSchedule(scheduleId);
         toast({
           title: "面接予定をキャンセルしました",
           description: "応募記録も更新されました",
         });
       } else {
         // 普通的日程删除
-        if (!confirm("このスケジュールを削除しますか？")) return;
         await deleteSchedule(scheduleId);
         toast({
           title: "削除完了",
           description: "スケジュールを削除しました",
         });
       }
-
-      // 重新加载数据
       loadData();
     } catch (error: any) {
       console.error('Error deleting schedule:', error);
@@ -438,7 +473,7 @@ function StudentScheduleContent() {
   // 修改周历渲染部分，添加删除按钮
   const renderScheduleItem = (schedule: StudentSchedule) => {
     const config = getScheduleTypeConfig(schedule.schedule_type);
-    const isInterview = schedule.id.match(/^(first|second|final)_(.+)$/);
+    const isInterview = schedule.schedule_type === 'interview' && schedule.application_id;
     const isMentoring = schedule.schedule_type === 'mentoring';
     
     return (
@@ -465,8 +500,7 @@ function StudentScheduleContent() {
                 className="p-1 rounded bg-blue-100 hover:bg-blue-200 text-blue-600"
                 onClick={(e) => {
                   e.stopPropagation();
-                  // 跳转到应聘管理页面
-                  window.location.href = `/applications?id=${isInterview[2]}`;
+                  window.location.href = `/applications?id=${schedule.application_id}`;
                 }}
                 title="応募詳細へ"
               >
@@ -476,7 +510,7 @@ function StudentScheduleContent() {
                 className="p-1 rounded bg-red-100 hover:bg-red-200 text-red-600"
                 onClick={(e) => {
                   e.stopPropagation();
-                  handleDeleteSchedule(schedule.id);
+                  setPendingDeleteSchedule(schedule);
                 }}
                 title="面接をキャンセル"
               >
@@ -488,7 +522,6 @@ function StudentScheduleContent() {
               className="p-1 rounded bg-blue-100 hover:bg-blue-200 text-blue-600"
               onClick={(e) => {
                 e.stopPropagation();
-                // 跳转到辅导预约页面
                 window.location.href = `/mentoring`;
               }}
               title="辅导予約詳細へ"
@@ -511,7 +544,7 @@ function StudentScheduleContent() {
                 className="p-1 rounded bg-red-100 hover:bg-red-200 text-red-600"
                 onClick={(e) => {
                   e.stopPropagation();
-                  handleDeleteSchedule(schedule.id);
+                  setPendingDeleteSchedule(schedule);
                 }}
                 title="削除"
               >
@@ -866,6 +899,26 @@ function StudentScheduleContent() {
             </TabsContent>
           </Tabs>
         </div>
+        {/* 页面底部渲染AlertDialog */}
+        <AlertDialog open={!!pendingDeleteSchedule} onOpenChange={open => { if (!open) setPendingDeleteSchedule(null) }}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>面接予定をキャンセルしますか？</AlertDialogTitle>
+              <div className="text-sm text-muted-foreground">この操作は応募記録にも影響します。</div>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setPendingDeleteSchedule(null)}>キャンセル</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={async () => {
+                  if (pendingDeleteSchedule) {
+                    await handleDeleteSchedule(pendingDeleteSchedule.id);
+                    setPendingDeleteSchedule(null);
+                  }
+                }}
+              >はい</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </ProtectedRoute>
   )

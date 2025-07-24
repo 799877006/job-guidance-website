@@ -90,9 +90,18 @@ function ApplicationsContent() {
         status: '書類選考中',
         applied_at: new Date().toISOString(),
         first_interview_at: null,
+        first_interview_end: null,
         second_interview_at: null,
+        second_interview_end: null,
         final_interview_at: null,
-        offer_received_at: null
+        final_interview_end: null,
+        offer_received_at: null,
+        annual_salary: null,
+        monthly_salary: null,
+        benefits: [],
+        location: null,
+        work_hours: null,
+        other_conditions: null,
       });
 
       await loadApplications();
@@ -213,10 +222,20 @@ function ApplicationsContent() {
         
         if (startTime) {
           const utcStartTime = toUTCDateTime(startTime);
+          const utcEndTime = toUTCDateTime(endTime);
           updates[`${it.key}_interview_at`] = utcStartTime;
-          await syncInterviewToSchedule(user.id, app.company_name, utcStartTime, it.type, toUTCDateTime(endTime));
+          updates[`${it.key}_interview_end`] = utcEndTime; // 新增：end时间也转为timestamptz
+          await syncInterviewToSchedule(
+            user.id,
+            app.company_name,
+            utcStartTime,
+            it.type,
+            utcEndTime,
+            app.id // 传入 applicationId
+          );
         } else {
           updates[`${it.key}_interview_at`] = null;
+          updates[`${it.key}_interview_end`] = null; // 新增
         }
       }
 
@@ -263,7 +282,8 @@ function ApplicationsContent() {
     companyName: string,
     interviewDate: string | null,
     interviewType: '一次' | '二次' | '最終',
-    interviewEndDate?: string | null
+    interviewEndDate?: string | null,
+    applicationId?: string
   ) => {
     try {
       if (!interviewDate) {
@@ -273,7 +293,7 @@ function ApplicationsContent() {
 
       // 准备日程数据
       const parsedStartDate = parseISO(interviewDate);
-      let parsedEndDate;
+      let parsedEndDate: Date;
 
       if (interviewEndDate) {
         // 如果提供了结束时间，则使用它
@@ -282,35 +302,49 @@ function ApplicationsContent() {
         tempEndDate.setFullYear(parsedStartDate.getFullYear(), parsedStartDate.getMonth(), parsedStartDate.getDate());
         parsedEndDate = tempEndDate;
 
-        // 如果结束时间早于开始时间，则设置为开始时间+30分钟
-        if (parsedEndDate.getTime() < parsedStartDate.getTime()) {
-           parsedEndDate = new Date(parsedStartDate.getTime() + 30 * 60 * 1000);
+        // 再次检查跨天问题
+        if (parsedEndDate.getDate() !== parsedStartDate.getDate()) {
+          parsedEndDate.setHours(23, 59, 59, 999);
         }
       } else {
-        // 如果没有提供结束时间，则默认为开始时间+30分钟
-        parsedEndDate = new Date(parsedStartDate.getTime() + 30 * 60 * 1000);
-      }
-      
-      // 再次检查跨天问题
-      if (parsedEndDate.getDate() !== parsedStartDate.getDate()) {
-        parsedEndDate.setHours(23, 59, 59, 999);
+        parsedEndDate = parsedStartDate;
       }
 
+      // 1. 先查找是否已有对应的面试日程
+      const { data: existing, error: findError } = await supabase
+        .from('student_schedule')
+        .select('*')
+        .eq('student_id', userId)
+        .eq('schedule_type', 'interview')
+        .eq('title', `${companyName} - ${interviewType}面接`)
+        .eq('application_id', applicationId || null)
+        .maybeSingle();
 
       const scheduleData = {
         student_id: userId,
         date: format(parsedStartDate, 'yyyy-MM-dd'),
-        start_time: format(parsedStartDate, 'HH:mm'),
-        end_time: format(parsedEndDate, 'HH:mm'),
+        start_time: format(parsedStartDate, "yyyy-MM-dd'T'HH:mm:00"),
+        end_time: format(parsedEndDate, "yyyy-MM-dd'T'HH:mm:00"),
         schedule_type: 'interview' as const,
         title: `${companyName} - ${interviewType}面接`,
         description: `${companyName}の${interviewType}面接`,
-        color: '#3b82f6' // 蓝色
+        color: '#3b82f6', // 蓝色
+        application_id: applicationId || null,
       };
 
-      // 创建新日程
-      await createSchedule(scheduleData);
-
+      if (existing) {
+        // 2. 已有则 update
+        await updateSchedule(existing.id, scheduleData);
+        await updateApplication(applicationId!, {
+          first_interview_at: scheduleData.start_time,
+          second_interview_at: scheduleData.start_time,
+          final_interview_at: scheduleData.start_time,
+        });
+      } else {
+        // 3. 没有则 create
+        await createSchedule(scheduleData);
+      }
+          
     } catch (error) {
       console.error('Failed to sync interview schedule:', error);
       throw error; // 向上传递错误
@@ -323,11 +357,11 @@ function ApplicationsContent() {
     setSelectedApp(latestApp);
     setInterviewTimes({
       first_interview_start: formatDateTime(latestApp.first_interview_at),
-      first_interview_end: '', // 待实现
+      first_interview_end: formatDateTime(latestApp.first_interview_end),
       second_interview_start: formatDateTime(latestApp.second_interview_at),
-      second_interview_end: '', // 待实现
+      second_interview_end: formatDateTime(latestApp.second_interview_end),
       final_interview_start: formatDateTime(latestApp.final_interview_at),
-      final_interview_end: '', // 待实现
+      final_interview_end: formatDateTime(latestApp.final_interview_end),
       offer_received_at: formatDateTime(latestApp.offer_received_at),
     });
     setIsDetailsDialogOpen(true);

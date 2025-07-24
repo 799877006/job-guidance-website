@@ -1,0 +1,2 @@
+在student_schedule里更新面接时间的时候，applications表也要更新
+更新applications表的面接时间的时候也需要更新student_schedule里的时间

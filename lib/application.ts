@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import type { Application, ApplicationDetails, ApplicationStatus } from './types/application';
+import type { Application, ApplicationStatus } from './types/application';
 
 export async function getApplications() {
   const { data, error } = await supabase
@@ -51,29 +51,6 @@ export async function updateApplication(
     .from('applications')
     .update(updates)
     .eq('id', id);
-
-  if (error) throw error;
-  return data;
-}
-
-export async function createApplicationDetails(details: Omit<ApplicationDetails, 'id' | 'created_at' | 'updated_at'>) {
-  const { data, error } = await supabase
-    .from('application_details')
-    .insert([details])
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data;
-}
-
-export async function updateApplicationDetails(id: string, details: Partial<ApplicationDetails>) {
-  const { data, error } = await supabase
-    .from('application_details')
-    .update(details)
-    .eq('id', id)
-    .select()
-    .single();
 
   if (error) throw error;
   return data;

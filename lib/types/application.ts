@@ -21,6 +21,9 @@ export interface Application {
   first_interview_at: string | null;
   second_interview_at: string | null;
   final_interview_at: string | null;
+  first_interview_end: string | null;
+  second_interview_end: string | null;
+  final_interview_end: string | null;
   offer_received_at: string | null;
   created_at: string;
   updated_at: string;
