@@ -127,8 +127,11 @@ export default function DashboardPage() {
           id,
           company_name,
           first_interview_at,
+          first_interview_end,
           second_interview_at,
+          second_interview_end,
           final_interview_at,
+          final_interview_end,
           status
         `)
         .eq("user_id", user.id)
@@ -147,39 +150,45 @@ export default function DashboardPage() {
           // 添加一次面试
           if (app.first_interview_at && new Date(app.first_interview_at) >= new Date(todayTokyoString)) {
             const interviewDate = new Date(app.first_interview_at);
+            const interviewEnd = app.first_interview_end ? new Date(app.first_interview_end) : null;
             allInterviews.push({
               id: `first_${app.id}`,
               company_name: app.company_name,
-              scheduled_date: format(interviewDate, 'yyyy-MM-dd'),
-              scheduled_time: format(interviewDate, 'HH:mm:ss'),
+              start_time: format(interviewDate, 'HH:mm'),
+              end_time: interviewEnd ? format(interviewEnd, 'HH:mm') : '',
               interview_type: '一次面接',
-              status: getInterviewStatus(app.status, '一次面接', interviewDate)
+              status: getInterviewStatus(app.status, '一次面接', interviewDate),
+              date: format(interviewDate, 'yyyy-MM-dd'),
             });
           }
 
           // 添加二次面试
           if (app.second_interview_at && new Date(app.second_interview_at) >= new Date(todayTokyoString)) {
             const interviewDate = new Date(app.second_interview_at);
+            const interviewEnd = app.second_interview_end ? new Date(app.second_interview_end) : null;
             allInterviews.push({
               id: `second_${app.id}`,
               company_name: app.company_name,
-              scheduled_date: format(interviewDate, 'yyyy-MM-dd'),
-              scheduled_time: format(interviewDate, 'HH:mm:ss'),
+              start_time: format(interviewDate, 'HH:mm'),
+              end_time: interviewEnd ? format(interviewEnd, 'HH:mm') : '',
               interview_type: '二次面接',
-              status: getInterviewStatus(app.status, '二次面接', interviewDate)
+              status: getInterviewStatus(app.status, '二次面接', interviewDate),
+              date: format(interviewDate, 'yyyy-MM-dd'),
             });
           }
 
           // 添加最终面试
           if (app.final_interview_at && new Date(app.final_interview_at) >= new Date(todayTokyoString)) {
             const interviewDate = new Date(app.final_interview_at);
+            const interviewEnd = app.final_interview_end ? new Date(app.final_interview_end) : null;
             allInterviews.push({
               id: `final_${app.id}`,
               company_name: app.company_name,
-              scheduled_date: format(interviewDate, 'yyyy-MM-dd'),
-              scheduled_time: format(interviewDate, 'HH:mm:ss'),
+              start_time: format(interviewDate, 'HH:mm'),
+              end_time: interviewEnd ? format(interviewEnd, 'HH:mm') : '',
               interview_type: '最終面接',
-              status: getInterviewStatus(app.status, '最終面接', interviewDate)
+              status: getInterviewStatus(app.status, '最終面接', interviewDate),
+              date: format(interviewDate, 'yyyy-MM-dd'),
             });
           }
         });
@@ -187,8 +196,8 @@ export default function DashboardPage() {
 
       // 按日期和时间排序
       allInterviews.sort((a, b) => {
-        const dateA = `${a.scheduled_date} ${a.scheduled_time}`;
-        const dateB = `${b.scheduled_date} ${b.scheduled_time}`;
+        const dateA = `${a.date} ${a.start_time}`;
+        const dateB = `${b.date} ${b.start_time}`;
         return dateA.localeCompare(dateB);
       });
 
@@ -356,7 +365,7 @@ export default function DashboardPage() {
                             <div>
                               <div className="font-medium">{interview.company_name}</div>
                               <div className="text-sm text-gray-600">
-                                {format(new Date(interview.scheduled_date), 'yyyy年MM月dd日')} {interview.scheduled_time.slice(0, 5)}
+                                {format(new Date(interview.date), 'yyyy年MM月dd日')} {interview.start_time} ~ {interview.end_time}
                               </div>
                               <div className="text-sm text-gray-500">{interview.interview_type}</div>
                             </div>

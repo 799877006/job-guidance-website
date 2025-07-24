@@ -26,6 +26,7 @@ import {
   type StudentSchedule,
   type ScheduleType 
 } from "@/lib/student-schedule"
+import { createApplication } from "@/lib/application"
 import { supabase, type Interview } from "@/lib/supabase"
 import { format, addDays, startOfWeek, endOfWeek, isSameDay, parseISO } from "date-fns"
 import { ja } from "date-fns/locale"
@@ -171,6 +172,24 @@ function StudentScheduleContent() {
       // 拼接完整的ISO日期时间字符串
       const startDateTime = `${scheduleForm.date}T${scheduleForm.startTime}:00`;
       const endDateTime = `${scheduleForm.date}T${scheduleForm.endTime}:00`;
+      // if (scheduleForm.scheduleType === 'interview') {
+      //   const { data: app } = await createApplication({
+      //     user_id: user.id,
+      //     first_interview_at: startDateTime,
+      //     first_interview_end: endDateTime,
+      //     second_interview_at: startDateTime,
+      //     second_interview_end: endDateTime,
+      //     final_interview_at: startDateTime,
+      //     final_interview_end: endDateTime,
+      //     offer_received_at: null,
+      //     annual_salary: null,
+      //     monthly_salary: null,
+      //     benefits: [],
+      //     location: null,
+      //     work_hours: null,  
+      //     other_conditions: null,
+      //   })
+      // }
       await createSchedule({
         student_id: user.id,
         date: scheduleForm.date,
@@ -698,7 +717,7 @@ function StudentScheduleContent() {
                                 <SelectItem value="free">空き時間</SelectItem>
                                 <SelectItem value="busy">忙しい</SelectItem>
                                 <SelectItem value="class">授業</SelectItem>
-                                <SelectItem value="interview">面接</SelectItem>
+                                {/* <SelectItem value="interview">面接</SelectItem> */}
                                 <SelectItem value="other">その他</SelectItem>
                               </SelectContent>
                             </Select>

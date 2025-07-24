@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import {
   Dialog,
   DialogContent,
@@ -24,6 +25,7 @@ import { supabase } from "@/lib/supabase"
 import { useToast } from "@/hooks/use-toast"
 import { Application, ApplicationStatus } from "@/lib/types/application"
 import { format } from "date-fns"
+import { createSchedule, updateSchedule } from "@/lib/student-schedule"
 
 export default function ScheduleInterviewPage() {
   const { user } = useAuth()
@@ -37,10 +39,12 @@ export default function ScheduleInterviewPage() {
     position: "",
     interview_type: "",
     scheduled_date: "",
-    scheduled_time: "",
+    start_time: "", // 新增
+    end_time: "",   // 新增
     interview_notes: "",
     interview_location: "",
   })
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
 
   useEffect(() => {
     if (user) {
@@ -74,7 +78,8 @@ export default function ScheduleInterviewPage() {
     e.preventDefault()
 
     try {
-      const interviewDateTime = `${formData.scheduled_date}T${formData.scheduled_time}:00`;
+      const interviewStartDateTime = `${formData.scheduled_date}T${formData.start_time}:00`;
+      const interviewEndDateTime = `${formData.scheduled_date}T${formData.end_time}:00`;
       let updateData: any = {
         company_name: formData.company_name,
         position: formData.position,
@@ -86,15 +91,18 @@ export default function ScheduleInterviewPage() {
       // 根据面试类型设置对应的面试时间和状态
       switch (formData.interview_type) {
         case '一次面接':
-          updateData.first_interview_at = interviewDateTime;
+          updateData.first_interview_at = interviewStartDateTime;
+          updateData.first_interview_end = interviewEndDateTime;
           updateData.status = '一次面接待ち';
           break;
         case '二次面接':
-          updateData.second_interview_at = interviewDateTime;
+          updateData.second_interview_at = interviewStartDateTime;
+          updateData.second_interview_end = interviewEndDateTime;
           updateData.status = '二次面接待ち';
           break;
         case '最終面接':
-          updateData.final_interview_at = interviewDateTime;
+          updateData.final_interview_at = interviewStartDateTime;
+          updateData.final_interview_end = interviewEndDateTime;
           updateData.status = '最終面接待ち';
           break;
       }
@@ -106,7 +114,12 @@ export default function ScheduleInterviewPage() {
           .update(updateData)
           .eq("id", editingApplication.id)
 
-        if (error) throw error
+        updateSchedule(editingApplication.id, {
+          title: updateData.status,
+          start_time: updateData.first_interview_at,
+        })
+        
+          if (error) throw error
         toast({
           title: "更新完了",
           description: "面接情報を更新しました",
@@ -119,7 +132,16 @@ export default function ScheduleInterviewPage() {
         const { error } = await supabase
           .from("applications")
           .insert([updateData])
-
+        // 同步到日程表
+        createSchedule({
+          student_id: user!.id,
+          date: formData.scheduled_date,
+          start_time: interviewStartDateTime,
+          end_time: interviewEndDateTime,
+          schedule_type: "interview",
+          title: formData.interview_type,
+        })
+        
         if (error) throw error
         toast({
           title: "予約完了",
@@ -134,7 +156,8 @@ export default function ScheduleInterviewPage() {
         position: "",
         interview_type: "",
         scheduled_date: "",
-        scheduled_time: "",
+        start_time: "",
+        end_time: "",
         interview_notes: "",
         interview_location: "",
       })
@@ -154,23 +177,27 @@ export default function ScheduleInterviewPage() {
     // 确定面试类型和时间
     let interview_type = "";
     let scheduled_date = "";
-    let scheduled_time = "";
+    let start_time = "";
+    let end_time = "";
     
     if (application.first_interview_at) {
       interview_type = "一次面接";
       const date = new Date(application.first_interview_at);
       scheduled_date = format(date, "yyyy-MM-dd");
-      scheduled_time = format(date, "HH:mm");
+      start_time = format(date, "HH:mm");
+      end_time = application.first_interview_end ? format(new Date(application.first_interview_end), "HH:mm") : "";
     } else if (application.second_interview_at) {
       interview_type = "二次面接";
       const date = new Date(application.second_interview_at);
       scheduled_date = format(date, "yyyy-MM-dd");
-      scheduled_time = format(date, "HH:mm");
+      start_time = format(date, "HH:mm");
+      end_time = application.second_interview_end ? format(new Date(application.second_interview_end), "HH:mm") : "";
     } else if (application.final_interview_at) {
       interview_type = "最終面接";
       const date = new Date(application.final_interview_at);
       scheduled_date = format(date, "yyyy-MM-dd");
-      scheduled_time = format(date, "HH:mm");
+      start_time = format(date, "HH:mm");
+      end_time = application.final_interview_end ? format(new Date(application.final_interview_end), "HH:mm") : "";
     }
 
     setFormData({
@@ -178,7 +205,8 @@ export default function ScheduleInterviewPage() {
       position: application.position || "",
       interview_type,
       scheduled_date,
-      scheduled_time,
+      start_time,
+      end_time,
       interview_notes: application.interview_notes || "",
       interview_location: application.interview_location || "",
     })
@@ -186,8 +214,6 @@ export default function ScheduleInterviewPage() {
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm("この面接を削除しますか？")) return
-
     try {
       const { error } = await supabase
         .from("applications")
@@ -233,21 +259,24 @@ export default function ScheduleInterviewPage() {
     if (application.first_interview_at) {
       return {
         date: format(new Date(application.first_interview_at), "yyyy-MM-dd"),
-        time: format(new Date(application.first_interview_at), "HH:mm"),
+        start_time: format(new Date(application.first_interview_at), "HH:mm"),
+        end_time: application.first_interview_end ? format(new Date(application.first_interview_end), "HH:mm") : "",
         type: "一次面接"
       };
     }
     if (application.second_interview_at) {
       return {
         date: format(new Date(application.second_interview_at), "yyyy-MM-dd"),
-        time: format(new Date(application.second_interview_at), "HH:mm"),
+        start_time: format(new Date(application.second_interview_at), "HH:mm"),
+        end_time: application.second_interview_end ? format(new Date(application.second_interview_end), "HH:mm") : "",
         type: "二次面接"
       };
     }
     if (application.final_interview_at) {
       return {
         date: format(new Date(application.final_interview_at), "yyyy-MM-dd"),
-        time: format(new Date(application.final_interview_at), "HH:mm"),
+        start_time: format(new Date(application.final_interview_at), "HH:mm"),
+        end_time: application.final_interview_end ? format(new Date(application.final_interview_end), "HH:mm") : "",
         type: "最終面接"
       };
     }
@@ -308,7 +337,8 @@ export default function ScheduleInterviewPage() {
                         position: "",
                         interview_type: "",
                         scheduled_date: "",
-                        scheduled_time: "",
+                        start_time: "",
+                        end_time: "",
                         interview_notes: "",
                         interview_location: "",
                       })
@@ -360,7 +390,7 @@ export default function ScheduleInterviewPage() {
                         </SelectContent>
                       </Select>
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-3 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="date">面接日 *</Label>
                         <Input
@@ -372,12 +402,22 @@ export default function ScheduleInterviewPage() {
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="time">面接時間 *</Label>
+                        <Label htmlFor="start_time">面接開始時間 *</Label>
                         <Input
-                          id="time"
+                          id="start_time"
                           type="time"
-                          value={formData.scheduled_time}
-                          onChange={(e) => setFormData((prev) => ({ ...prev, scheduled_time: e.target.value }))}
+                          value={formData.start_time}
+                          onChange={(e) => setFormData((prev) => ({ ...prev, start_time: e.target.value }))}
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="end_time">面接終了時間 *</Label>
+                        <Input
+                          id="end_time"
+                          type="time"
+                          value={formData.end_time}
+                          onChange={(e) => setFormData((prev) => ({ ...prev, end_time: e.target.value }))}
                           required
                         />
                       </div>
@@ -473,7 +513,7 @@ export default function ScheduleInterviewPage() {
                               <Calendar className="h-4 w-4 mr-1" />
                               {interviewInfo.date}
                               <Clock className="h-4 w-4 ml-3 mr-1" />
-                              {interviewInfo.time}
+                              {interviewInfo.start_time} ~ {interviewInfo.end_time}
                             </div>
                             {application.interview_location && (
                               <div className="text-sm text-gray-500 mt-1">📍 {application.interview_location}</div>
@@ -490,7 +530,7 @@ export default function ScheduleInterviewPage() {
                             <Button variant="ghost" size="sm" onClick={() => handleEdit(application)}>
                               <Edit className="h-4 w-4" />
                             </Button>
-                            <Button variant="ghost" size="sm" onClick={() => handleDelete(application.id)}>
+                            <Button variant="ghost" size="sm" onClick={() => setPendingDeleteId(application.id)}>
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           </div>
@@ -528,6 +568,26 @@ export default function ScheduleInterviewPage() {
           </Card>
         </div>
       </div>
+      {/* 页面底部渲染AlertDialog */}
+      <AlertDialog open={!!pendingDeleteId} onOpenChange={open => { if (!open) setPendingDeleteId(null) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>この面接を削除しますか？</AlertDialogTitle>
+            <div className="text-sm text-muted-foreground">この操作は元に戻せません。</div>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setPendingDeleteId(null)}>キャンセル</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                if (pendingDeleteId) {
+                  await handleDelete(pendingDeleteId);
+                  setPendingDeleteId(null);
+                }
+              }}
+            >はい</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </ProtectedRoute>
   )
 } 
