@@ -14,10 +14,7 @@ export async function getApplications() {
 export async function getApplicationsByStatus(status: ApplicationStatus) {
   const { data, error } = await supabase
     .from('applications')
-    .select(`
-      *,
-      details:application_details(*)
-    `)
+    .select(`*`)
     .eq('status', status)
     .order('applied_at', { ascending: false });
 

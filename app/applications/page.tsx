@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ApplicationStatus, ApplicationWithDetails } from '@/lib/types/application';
-import { getApplications, getApplicationsByStatus, createApplication, updateApplication, createApplicationDetails, updateApplicationDetails } from '@/lib/application';
+import { getApplications, getApplicationsByStatus, createApplication, updateApplication } from '@/lib/application';
 import { format, parseISO } from 'date-fns';
 import { formatInTimeZone } from 'date-fns-tz';
 import { useToast } from '@/hooks/use-toast';
