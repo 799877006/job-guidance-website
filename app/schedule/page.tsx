@@ -721,7 +721,9 @@ function StudentScheduleContent() {
                                 <SelectItem value="free">空き時間</SelectItem>
                                 <SelectItem value="busy">忙しい</SelectItem>
                                 <SelectItem value="class">授業</SelectItem>
-                                {/* <SelectItem value="interview">面接</SelectItem> */}
+                                <SelectItem value="interview">一次面接</SelectItem>
+                                <SelectItem value="interview">二次面接</SelectItem>
+                                <SelectItem value="interview">最終面接</SelectItem>
                                 <SelectItem value="other">その他</SelectItem>
                               </SelectContent>
                             </Select>

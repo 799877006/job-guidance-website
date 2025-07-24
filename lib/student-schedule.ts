@@ -56,29 +56,31 @@ export async function getStudentSchedule(
 // 创建新的时间安排
 export async function createSchedule(scheduleData: CreateScheduleData): Promise<StudentSchedule> {
   // 检查时间冲突
-  const conflicts = await checkTimeConflict(
-    scheduleData.student_id,
-    scheduleData.date,
-    scheduleData.start_time,
-    scheduleData.end_time
-  )
-
-  if (conflicts.length > 0) {
-    throw new Error('選択した時間には既にスケジュールが入っています')
-  }
+    console.log('scheduleData', scheduleData)
+    const conflicts = await checkTimeConflict(
+      scheduleData.student_id,
+      scheduleData.date,
+      scheduleData.start_time,
+      scheduleData.end_time
+    )
+    if (conflicts.length > 0) {
+      for (const conflict of conflicts) {
+        if (conflict.schedule_type !== 'free') {
+          throw new Error('選択した時間には既にスケジュールが入っています')
+        }
+      }
+    }
 
   const { data, error } = await supabase
     .from('student_schedule')
     .insert([scheduleData])
     .select()
     .single()
-
   if (error) {
     console.error('Error creating schedule:', error)
     throw new Error(`スケジュール作成失敗: ${error.message}`)
   }
-
-  return data
+  return data as StudentSchedule
 }
 
 // 更新时间安排
@@ -95,7 +97,6 @@ export async function updateSchedule(
       .eq('id', scheduleId)
       .single()
 
-    if (currentSchedule) {
       const conflicts = await checkTimeConflict(
         currentSchedule.student_id,
         updateData.date || currentSchedule.date,
@@ -105,10 +106,14 @@ export async function updateSchedule(
       )
 
       if (conflicts.length > 0) {
-        throw new Error('選択した時間には既にスケジュールが入っています')
+        for (const conflict of conflicts) {
+          if (conflict.schedule_type !== 'free') {
+            throw new Error('選択した時間には既にスケジュールが入っています')
+          }
+        }
       }
     }
-  }
+  
 
   const { data, error } = await supabase
     .from('student_schedule')
@@ -122,7 +127,7 @@ export async function updateSchedule(
     throw new Error(`スケジュール更新失敗: ${error.message}`)
   }
 
-  return data
+  return data as StudentSchedule
 }
 
 // 删除时间安排
