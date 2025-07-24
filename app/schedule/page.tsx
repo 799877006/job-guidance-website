@@ -105,8 +105,9 @@ function StudentScheduleContent() {
       // 合并日程和预约
       const combinedSchedule = [
         ...(schedule || []),
-        ...(mentoringBookings?.map(booking => ({
+        ...((mentoringBookings?.map(booking => ({
           id: booking.id,
+          student_id: booking.student_id,
           date: booking.date,
           start_time: booking.start_time,
           end_time: booking.end_time,
@@ -114,8 +115,11 @@ function StudentScheduleContent() {
           title: booking.subject,
           description: booking.description,
           location: '',
-          color: '#3b82f6' // 使用蓝色表示辅导预约
-        })) || [])
+          color: '#3b82f6',
+          application_id: null,
+          created_at: booking.created_at || '',
+          updated_at: booking.updated_at || '',
+        })) || []) as StudentSchedule[])
       ]
 
       setMySchedule(combinedSchedule)
@@ -371,8 +375,8 @@ function StudentScheduleContent() {
     setEditingSchedule(schedule)
     setScheduleForm({
       date: schedule.date,
-      startTime: schedule.start_time,
-      endTime: schedule.end_time,
+      startTime: schedule.start_time.slice(11, 16) || schedule.start_time.slice(0, 5),
+      endTime: schedule.end_time.slice(11, 16) || schedule.end_time.slice(0, 5),
       scheduleType: schedule.schedule_type,
       title: schedule.title,
       description: schedule.description || "",
@@ -505,7 +509,7 @@ function StudentScheduleContent() {
           border: `1px solid ${config.color}`
         }}
       >
-        <div className="font-medium">{schedule.start_time.slice(0, 5)} - {schedule.end_time.slice(0, 5)}</div>
+        <div className="font-medium">{schedule.start_time.slice(11, 16) || schedule.start_time.slice(0, 5)} - {schedule.end_time.slice(11, 16) || schedule.end_time.slice(0, 5)}</div>
         <div className="truncate">{schedule.title}</div>
         {schedule.location && (
           <div className="truncate opacity-75">{schedule.location}</div>
@@ -607,7 +611,7 @@ function StudentScheduleContent() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-gray-600">総スケジュール</CardTitle>
+                <CardTitle className="text-sm font-medium text-gray-600">週間スケジュール</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-blue-600">{mySchedule.length}</div>
