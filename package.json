@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "build": "next build",
+    "build": "prisma generate && next build",
     "dev": "next dev",
     "lint": "next lint",
     "start": "next start",
@@ -12,12 +12,16 @@
     "prisma:push": "dotenv -e .env -- prisma db push",
     "prisma:studio": "dotenv -e .env -- prisma studio",
     "prisma:migrate": "dotenv -e .env -- prisma migrate dev",
-    "prisma:migrate:deploy": "dotenv -e .env -- prisma migrate deploy"
+    "prisma:migrate:deploy": "dotenv -e .env -- prisma migrate deploy",
+    "postinstall": "prisma generate"
   },
   "pnpm": {
     "allowedBuildScripts": [
       "@vercel/speed-insights",
-      "sharp"
+      "sharp",
+      "@prisma/client",
+      "@prisma/engines",
+      "prisma"
     ]
   },
   "dependencies": {
