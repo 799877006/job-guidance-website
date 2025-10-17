@@ -1,5 +1,5 @@
 import { supabase } from './supabase'
-import type { Profile } from './types/supabase'
+import type { Profile } from '../types/supabase'
 
 // 检查是否在浏览器环境中
 const isBrowser = typeof window !== 'undefined'

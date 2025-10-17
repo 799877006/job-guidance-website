@@ -1,0 +1,319 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+
+}
+
+// 分离注册用的角色和所有角色，保证不会注册administrator角色
+enum RegisterRole {
+  STUDENT
+  INSTRUCTOR
+}
+
+// 用户角色枚举
+enum UserRole {
+  STUDENT @map("学生")  
+  INSTRUCTOR @map("講師")
+  ADMINISTRATOR @map("管理者")
+}
+
+// 用户表
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  name          String
+  role          UserRole  @default(STUDENT)  // 使用枚举
+  
+  // 基础字段（所有角色共用）
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  // 可选的基础信息字段
+  phone         String?   // 电话号码
+  avatarUrl     String?   // 头像URL
+  bio           String?   // 个人简介
+  
+  // 关系字段
+  applications  Application[]  // 只有学生会用到
+  schedules     Schedule[]     // 所有角色都可能用到，除了administrator
+  applicationsCreatedByAdministrator Application[] @relation("createdByAdministrator") // 用来标记application是哪个adminstrator代投的
+  notifications Notification[]
+  feedback      Feedback[]
+  // 角色特有信息的关系字段
+  studentProfile StudentProfile?
+  instructorProfile InstructorProfile?
+
+  @@map("users")
+}
+
+// 学生详细信息表
+model StudentProfile {
+  id            String @id @default(uuid())
+  userId        String @unique
+  user          User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // 教育背景
+  university    String
+  major         String
+  graduationYear Int
+
+  
+  // 技能和经验
+  skills        String[] // 技能列表
+  languages     String[] // 语言能力
+  
+  // 求职相关
+  resumeUrl     String // 简历文件URL
+  
+  // 求职偏好
+  preferredLocations String[] // 期望工作地点
+  formerSalary     Float?  // 前职薪资
+  expectedSalary     Float?   // 期望薪资
+  availableStartDate DateTime? // 可开始工作日期
+  
+  // 时间戳
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("student_profiles")
+}
+
+// 讲师详细信息表
+model InstructorProfile {
+  id            String @id @default(uuid())
+  userId        String @unique
+  user          User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // 基本信息
+  nationality   String
+  experience    Int?   // 工作经验年数（年）
+  
+  // 教育背景
+  educationBackground String?
+  
+  // 自我介绍
+  introduction String?
+  //pdf简历
+  resumePdfUrl String? // pdf简历URL
+  // 时间戳
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("instructor_profiles")
+}
+
+
+// 申请状态枚举
+enum ApplicationStatus {
+  DOCUMENT_SCREENING  @map("書類選考中")
+  FIRST_INTERVIEW_WAITING @map("一次面接待ち")
+  FIRST_INTERVIEW_COMPLETED @map("一次面接完了")
+  SECOND_INTERVIEW_WAITING @map("二次面接待ち")
+  SECOND_INTERVIEW_COMPLETED @map("二次面接完了")
+  FINAL_INTERVIEW_WAITING @map("最終面接待ち")
+  FINAL_INTERVIEW_COMPLETED @map("最終面接完了")
+  OFFER_RECEIVED @map("内定")
+  REJECTED @map("不合格")
+}
+
+// 申请表
+model Application {
+  id                   String            @id @default(uuid())
+  // studentId用来标记application是哪个学生的申请
+  studentId            String            @map("student_id")
+  student              User              @relation(fields: [studentId], references: [id])
+  companyId            String            @map("company_id")
+  company              Company           @relation(fields: [companyId], references: [id])
+  // application也可以是adminstrator代投的，
+  administratorId      String?           @map("administrator_id")
+  administrator        User?             @relation(fields: [administratorId], references: [id], name: "createdByAdministrator") // 用来标记application是哪个adminstrator代投的
+  status               ApplicationStatus
+  appliedAt            DateTime          @map("applied_at")
+  //预约面试时间相关字段
+  casualInterviewAt    DateTime?         @map("casual_interview_at")
+  casualInterviewEnd   DateTime?         @map("casual_interview_end")
+  firstInterviewAt     DateTime?         @map("first_interview_at") 
+  secondInterviewAt    DateTime?         @map("second_interview_at")
+  finalInterviewAt     DateTime?         @map("final_interview_at")
+  firstInterviewEnd    DateTime?         @map("first_interview_end")
+  secondInterviewEnd   DateTime?         @map("second_interview_end")
+  finalInterviewEnd    DateTime?         @map("final_interview_end")
+
+  offerReceivedAt      DateTime?         @map("offer_received_at")
+
+  //待遇福利相关字段
+  annualSalary         Float?            @map("annual_salary")
+  monthlySalary        Float?            @map("monthly_salary")
+  benefits             String[]
+  location             String?
+  workHours            String?           @map("work_hours")
+  otherConditions      String?           @map("other_conditions")
+  
+  createdAt            DateTime          @default(now()) @map("created_at")
+  updatedAt            DateTime          @updatedAt @map("updated_at")
+  interviews           Interview[]
+  schedules            Schedule[]
+
+  @@map("applications")
+}
+
+// 公司表
+model Company {
+  id            String        @id @default(uuid())
+  name          String
+  position      String
+  description   String?
+  location      String
+  benefits      String[]
+  workHours     String        @map("work_hours")
+  homepageUrl   String?       @map("homepage_url")
+  applications  Application[]
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+
+  @@map("companies")
+}
+
+// 日程类型枚举
+enum ScheduleType {
+  INTERVIEW
+  MENTORING
+  OTHER
+}
+
+// 日程状态枚举
+enum ScheduleStatus {
+  SCHEDULED @map("予定")
+  COMPLETED @map("完了")
+  //用于写错了删除日程或者有事情取消预约
+  CANCELLED @map("キャンセル")
+  FREE @map("空き時間")
+}
+
+// 日程表，面试和日程表的同步更新采用服务层实现，而不是在数据库中实现
+model Schedule {
+  id              String          @id @default(uuid())
+  userId          String          @map("user_id")
+  user            User            @relation(fields: [userId], references: [id])
+  title           String
+  startTime       DateTime        @map("start_time")
+  endTime         DateTime        @map("end_time")
+  status          ScheduleStatus
+  type            ScheduleType
+  // 通过application找到interview
+  applicationId   String?         @map("application_id")
+  application     Application?    @relation(fields: [applicationId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+  
+  // 扩展字段 - 用于学生日程中的预约面试和辅导
+  companyName     String?         @map("company_name")
+  instructorId    String?         @map("instructor_id")
+  notes           String?         @map("notes")
+  mentoringType   MentoringType? @map("mentoring_type")   // 辅导类型
+  availableSlots  Int?           @map("available_slots")   // 可预约人数（日语一对多和讲座用）
+  bookedSlots     Int?           @map("booked_slots")     // 已预约人数
+  onlineUrl       String?        @map("online_url")       // 线上会议URL
+
+
+  @@map("schedules")
+}
+
+// 面试状态枚举
+enum InterviewStatus {
+  SCHEDULED    @map("予定済み")      // 已预约
+  COMPLETED    @map("完了")         // 已完成
+  CANCELLED    @map("キャンセル")    // 已取消
+}
+
+
+enum MentoringType {
+  INTERVIEW_PREP     @map("面接指導")      // 一对一面试辅导
+  JAPANESE_PRIVATE   @map("日本語個人")    // 一对一日语辅导
+  JAPANESE_GROUP     @map("日本語グループ") // 一对多日语辅导
+  CAREER_SEMINAR     @map("就職セミナー")   // 就职讲座
+}
+// 面试类型枚举
+enum InterviewType {
+  FIRST  @map("一次面接")
+  SECOND @map("二次面接")
+  FINAL  @map("最終面接")
+  CASUAL @map("カジュアル面接")
+  OTHER  @map("その他")
+}
+
+// 面试表
+model Interview {
+  id              String          @id @default(uuid())
+  applicationId   String          @map("application_id")
+  application     Application     @relation(fields: [applicationId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  startTime       DateTime        @map("start_time")
+  endTime         DateTime        @map("end_time")
+  status          InterviewStatus
+  type            InterviewType
+  notes           String?         @map("notes")
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+  @@map("interviews")
+}
+
+// 通知类型枚举
+enum NotificationType {
+  SCHEDULE_CREATED    @map("予約作成")
+  SCHEDULE_UPDATED    @map("予約更新")
+  SCHEDULE_DELETED    @map("予約削除")
+  SCHEDULE_REMINDER   @map("予約リマインダー")
+  MENTORING_REQUEST   @map("指導依頼")
+  MENTORING_ACCEPTED  @map("指導承認")
+  MENTORING_REJECTED  @map("指導拒否")
+  SYSTEM_NOTICE      @map("システム通知")
+}
+
+// 通知状态枚举
+enum NotificationStatus {
+  UNREAD    @map("未読")
+  READ      @map("既読")
+  ARCHIVED  @map("アーカイブ")
+}
+
+// 通知表
+model Notification {
+  id          String            @id @default(uuid())
+  userId      String            @map("user_id")
+  user        User              @relation(fields: [userId], references: [id])
+  type        NotificationType
+  title       String
+  content     String
+  status      NotificationStatus @default(UNREAD)
+  metadata    Json?             // 存储额外的相关数据
+  createdAt   DateTime          @default(now()) @map("created_at")
+  readAt      DateTime?         @map("read_at")
+  
+  @@map("notifications")
+  @@index([userId, status])
+  @@index([createdAt])
+}
+
+
+// 当前 Prisma schema 中缺失
+model Feedback {
+  id          String   @id @default(uuid())
+  userId      String?  @map("user_id")
+  user        User?    @relation(fields: [userId], references: [id])
+  name        String
+  email       String
+  category    String   // bug, feature, improvement, question, other
+  subject     String
+  message     String
+  status      String   @default("pending") // pending, sent, email_failed
+  createdAt   DateTime @default(now()) @map("created_at")
+  
+  @@map("feedback")
+}

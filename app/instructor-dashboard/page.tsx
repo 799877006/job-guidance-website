@@ -22,7 +22,7 @@ import {
   getInstructorBookings,
   getPendingBookings,
   updateBookingStatus 
-} from "@/lib/mentoring"
+} from "@/lib/services/mentoring"
 import { format, addDays, startOfWeek, endOfWeek, isSameDay, parseISO } from "date-fns"
 import { ja } from "date-fns/locale"
 import Link from "next/link"

@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Briefcase, Eye, EyeOff } from "lucide-react"
-import { signUp } from "@/lib/auth"
+import { signUp } from "@/lib/services/auth"
 import { useToast } from "@/hooks/use-toast"
 
 export default function RegisterPage() {

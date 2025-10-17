@@ -3,9 +3,9 @@
 import type React from "react"
 import { createContext, useContext, useEffect, useState } from "react"
 import type { User, AuthChangeEvent } from "@supabase/supabase-js"
-import { supabase } from "@/lib/supabase"
+import { supabase } from "@/lib/services/supabase"
 import type { Profile } from "@/lib/types/supabase"
-import { getProfile, createProfile } from "@/lib/auth"
+import { getProfile, createProfile } from "@/lib/services/auth"
 
 interface AuthContextType {
   user: User | null

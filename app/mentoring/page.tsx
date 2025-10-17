@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Calendar, Clock, User, BookOpen, CheckCircle, XCircle, AlertCircle } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { getAvailableInstructors, getInstructors, createBooking, getStudentBookings } from "@/lib/mentoring"
+import { getAvailableInstructors, getInstructors, createBooking, getStudentBookings } from "@/lib/services/mentoring"
 import { format, addDays, startOfWeek, endOfWeek, isSameDay, parseISO } from "date-fns"
 import { ja } from "date-fns/locale"
 

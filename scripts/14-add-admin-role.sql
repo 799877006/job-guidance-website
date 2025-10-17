@@ -3,7 +3,6 @@ DROP POLICY IF EXISTS "Instructors can manage own availability" ON instructor_av
 DROP POLICY IF EXISTS "Students can view instructor availability" ON instructor_availability;
 DROP POLICY IF EXISTS "Students can manage own schedule" ON student_schedule;
 DROP POLICY IF EXISTS "Instructors can view student schedules" ON student_schedule;
-DROP POLICY IF EXISTS "Instructors can manage all advertisements" ON advertisements;
 
 -- 2. 使用 CASCADE 删除 user_role 类型及其所有依赖
 DROP TYPE IF EXISTS user_role CASCADE;
@@ -18,16 +17,6 @@ ALTER TABLE profiles
 -- 5. 确保必要的列存在
 DO $$ 
 BEGIN 
-  -- 检查并添加 user_id 列到 advertisements 表
-  IF NOT EXISTS (
-    SELECT 1 
-    FROM information_schema.columns 
-    WHERE table_name = 'advertisements' 
-    AND column_name = 'user_id'
-  ) THEN
-    ALTER TABLE advertisements 
-    ADD COLUMN user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL;
-  END IF;
 END $$;
 
 -- 6. 重新创建instructor_availability的策略
@@ -308,41 +297,3 @@ CREATE POLICY "Users can update their own message status"
 ON user_messages FOR UPDATE
 USING (user_id = auth.uid())
 WITH CHECK (user_id = auth.uid());
-
--- Advertisements 表
-DROP POLICY IF EXISTS "Anyone can view active advertisements" ON advertisements;
-DROP POLICY IF EXISTS "Authenticated users can view own advertisements" ON advertisements;
-DROP POLICY IF EXISTS "Authenticated users can create advertisements" ON advertisements;
-DROP POLICY IF EXISTS "Authenticated users can update own advertisements" ON advertisements;
-DROP POLICY IF EXISTS "Authenticated users can delete own advertisements" ON advertisements;
-
-CREATE POLICY "Admins can manage all advertisements"
-ON advertisements FOR ALL
-USING (
-  EXISTS (
-    SELECT 1 FROM profiles
-    WHERE profiles.id = auth.uid()
-    AND profiles.role = 'admin'
-  )
-);
-
-CREATE POLICY "Anyone can view active advertisements"
-ON advertisements FOR SELECT
-USING (is_active = true);
-
-CREATE POLICY "Users can view own advertisements"
-ON advertisements FOR SELECT
-USING (auth.uid() = user_id);
-
-CREATE POLICY "Users can create advertisements"
-ON advertisements FOR INSERT
-WITH CHECK (auth.uid() IS NOT NULL);
-
-CREATE POLICY "Users can update own advertisements"
-ON advertisements FOR UPDATE
-USING (auth.uid() = user_id)
-WITH CHECK (auth.uid() = user_id);
-
-CREATE POLICY "Users can delete own advertisements"
-ON advertisements FOR DELETE
-USING (auth.uid() = user_id); 

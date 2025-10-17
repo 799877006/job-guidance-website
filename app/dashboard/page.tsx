@@ -4,10 +4,10 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { getApplicationCounts } from "@/lib/application";
+import { getApplicationCounts } from "@/lib/services/application";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/components/auth-provider";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/lib/services/supabase";
 import { format, parseISO } from "date-fns";
 import { ja } from "date-fns/locale";
 import {
@@ -20,17 +20,12 @@ import {
   Plus,
   Building,
   TrendingUp,
-  MapPin,
-  Coins,
-  ArrowUpRight,
   ArrowRight
 } from "lucide-react";
 import { ProtectedRoute } from "@/components/protected-route";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { MessageBox } from '@/components/message-box';
-import { getLatestJobAdvertisements } from '@/lib/dashboard';
-import type { JobAdvertisement } from '@/lib/types/dashboard';
 import { useRouter } from "next/navigation";
 
 interface DashboardStats {
@@ -60,7 +55,6 @@ export default function DashboardPage() {
     pending: 0
   });
   const [upcomingInterviews, setUpcomingInterviews] = useState<any[]>([]);
-  const [advertisements, setAdvertisements] = useState<JobAdvertisement[]>([]);
 
   useEffect(() => {
     if (user && profile) {
@@ -203,9 +197,6 @@ export default function DashboardPage() {
 
       setUpcomingInterviews(allInterviews);
 
-      // 获取最新求人信息
-      const jobAds = await getLatestJobAdvertisements(5);
-      setAdvertisements(jobAds);
     } catch (error) {
       console.error("Error fetching dashboard data:", error);
       toast({
@@ -442,78 +433,6 @@ export default function DashboardPage() {
                 </CardContent>
               </Card>
 
-              {/* Advertisements */}
-              {advertisements.length > 0 && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle>求人情報</CardTitle>
-                    <CardDescription>おすすめの求人をチェック</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      {advertisements.map((ad) => (
-                        <div key={ad.id} className="border rounded-lg p-3 hover:bg-gray-50 transition-colors">
-                          <div className="flex items-start space-x-3">
-                            {ad.image_url && (
-                              <img
-                                src={ad.image_url || "/placeholder.svg"}
-                                alt={ad.title}
-                                className="w-12 h-12 rounded object-cover"
-                              />
-                            )}
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2">
-                                <h4 className="font-medium text-sm truncate">{ad.title}</h4>
-                                <Badge variant="outline" className="text-xs">
-                                  {ad.source}
-                                </Badge>
-                              </div>
-                              <p className="text-xs text-gray-600 mt-1">{ad.company_name}</p>
-                              {ad.location && (
-                                <p className="text-xs text-gray-500">
-                                  <MapPin className="inline h-3 w-3 mr-1" />
-                                  {ad.location}
-                                </p>
-                              )}
-                              {ad.salary_range && (
-                                <p className="text-xs text-gray-500">
-                                  <Coins className="inline h-3 w-3 mr-1" />
-                                  {ad.salary_range}
-                                </p>
-                              )}
-                              {ad.description && (
-                                <p className="text-xs text-gray-500 mt-1 line-clamp-2">{ad.description}</p>
-                              )}
-                              <div className="flex items-center justify-between mt-2">
-                                <span className="text-xs text-gray-500">
-                                  {format(new Date(ad.posted_at), 'MM/dd HH:mm')}
-                                </span>
-                                <a
-                                  href={ad.link_url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-xs text-blue-600 hover:underline inline-flex items-center"
-                                >
-                                  詳細を見る
-                                  <ArrowUpRight className="h-3 w-3 ml-1" />
-                                </a>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                      <div className="text-center">
-                        <Link href="/jobs">
-                          <Button variant="outline" size="sm">
-                            すべての求人を見る
-                            <ArrowRight className="h-4 w-4 ml-2" />
-                          </Button>
-                        </Link>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
             </div>
           </div>
         </div>

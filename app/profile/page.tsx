@@ -13,8 +13,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { ArrowLeft, Upload, Save, User, Mail, Calendar, FileText, X } from "lucide-react"
 import { ProtectedRoute } from "@/components/protected-route"
 import { useAuth } from "@/components/auth-provider"
-import { updateProfile } from "@/lib/auth"
-import { supabase } from "@/lib/supabase"
+import { updateProfile } from "@/lib/services/auth"
+import { supabase } from "@/lib/services/supabase"
 import { useToast } from "@/hooks/use-toast"
 
 export default function ProfilePage() {

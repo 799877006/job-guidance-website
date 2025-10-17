@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
 import { useAuth } from '@/components/auth-provider';
-import { getUserMessages, getUnreadMessageCount, markMessageAsRead, markAllMessagesAsRead, getMessageTypeConfig } from '@/lib/message';
+import { getUserMessages, getUnreadMessageCount, markMessageAsRead, markAllMessagesAsRead, getMessageTypeConfig } from '@/lib/services/message';
 import type { MessageWithStatus } from '@/lib/types/message';
 
 export function MessageBox() {

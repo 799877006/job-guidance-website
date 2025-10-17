@@ -1,5 +1,5 @@
 import { supabase } from './supabase'
-import type { Database } from './types/supabase'
+import type { Database } from '../types/supabase'
 
 export type InstructorAvailability = Database['public']['Tables']['instructor_availability']['Row']
 export type MentoringBooking = Database['public']['Tables']['mentoring_bookings']['Row']

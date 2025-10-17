@@ -153,41 +153,6 @@ export type Database = {
           created_at?: string
         }
       }
-      advertisements: {
-        Row: {
-          id: string
-          title: string
-          description: string | null
-          image_url: string | null
-          link_url: string | null
-          company_name: string | null
-          is_active: boolean
-          created_at: string
-          expires_at: string | null
-        }
-        Insert: {
-          id?: string
-          title: string
-          description?: string | null
-          image_url?: string | null
-          link_url?: string | null
-          company_name?: string | null
-          is_active?: boolean
-          created_at?: string
-          expires_at?: string | null
-        }
-        Update: {
-          id?: string
-          title?: string
-          description?: string | null
-          image_url?: string | null
-          link_url?: string | null
-          company_name?: string | null
-          is_active?: boolean
-          created_at?: string
-          expires_at?: string | null
-        }
-      }
       feedback: {
         Row: {
           id: string

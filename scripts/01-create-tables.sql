@@ -76,18 +76,6 @@ CREATE TABLE public.feedback (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
 );
 
--- Advertisements table
-CREATE TABLE public.advertisements (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    title TEXT NOT NULL,
-    description TEXT,
-    image_url TEXT,
-    link_url TEXT,
-    company_name TEXT,
-    is_active BOOLEAN DEFAULT true,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
-    expires_at TIMESTAMP WITH TIME ZONE
-);
 
 -- Enable Row Level Security
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
@@ -95,7 +83,6 @@ ALTER TABLE public.applications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.interviews ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.feedback ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.companies ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.advertisements ENABLE ROW LEVEL SECURITY;
 
 -- Create policies
 CREATE POLICY "Users can view own profile" ON public.profiles FOR SELECT USING (auth.uid() = id);
@@ -116,7 +103,6 @@ CREATE POLICY "Users can insert feedback" ON public.feedback FOR INSERT WITH CHE
 CREATE POLICY "Users can view own feedback" ON public.feedback FOR SELECT USING (auth.uid() = user_id);
 
 CREATE POLICY "Anyone can view companies" ON public.companies FOR SELECT TO authenticated USING (true);
-CREATE POLICY "Anyone can view active advertisements" ON public.advertisements FOR SELECT TO authenticated USING (is_active = true);
 
 -- Create functions for updated_at
 CREATE OR REPLACE FUNCTION public.handle_updated_at()

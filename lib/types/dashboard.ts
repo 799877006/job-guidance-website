@@ -1,23 +1,5 @@
 // Dashboard页面使用的类型定义
 
-export interface JobAdvertisement {
-  id: string;
-  title: string;
-  company_name: string;
-  description?: string;
-  image_url?: string;
-  link_url: string;
-  source: string;
-  is_active: boolean;
-  salary_range?: string;
-  location?: string;
-  employment_type?: string;
-  requirements?: string;
-  benefits?: string[];
-  posted_at: string;
-  created_at: string;
-}
-
 export interface DashboardStats {
   total: number;
   rejected: number;

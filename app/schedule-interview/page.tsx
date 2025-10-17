@@ -21,11 +21,11 @@ import {
 import { Calendar, Clock, Building, ArrowLeft, Plus, Edit, Trash2 } from "lucide-react"
 import { ProtectedRoute } from "@/components/protected-route"
 import { useAuth } from "@/components/auth-provider"
-import { supabase } from "@/lib/supabase"
+import { supabase } from "@/lib/services/supabase"
 import { useToast } from "@/hooks/use-toast"
 import { Application, ApplicationStatus } from "@/lib/types/application"
 import { format } from "date-fns"
-import { createSchedule, updateSchedule } from "@/lib/student-schedule"
+import { createSchedule, updateSchedule } from "@/lib/services/student-schedule"
 
 export default function ScheduleInterviewPage() {
   const { user } = useAuth()

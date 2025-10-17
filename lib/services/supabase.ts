@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
-import type { Database } from './types/supabase'
+import type { Database } from '../types/supabase'
 
 // 简化配置：直接使用环境变量
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -75,17 +75,6 @@ export interface Company {
   created_at: string
 }
 
-export interface Advertisement {
-  id: string
-  title: string
-  description?: string
-  image_url?: string
-  link_url?: string
-  company_name?: string
-  is_active: boolean
-  created_at: string
-  expires_at?: string
-}
 
 export interface Feedback {
   id: string

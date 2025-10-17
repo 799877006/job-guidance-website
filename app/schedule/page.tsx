@@ -25,9 +25,9 @@ import {
   getScheduleTypeConfig,
   type StudentSchedule,
   type ScheduleType 
-} from "@/lib/student-schedule"
-import { createApplication } from "@/lib/application"
-import { supabase, type Interview } from "@/lib/supabase"
+} from "@/lib/services/student-schedule"
+import { createApplication } from "@/lib/services/application"
+import { supabase, type Interview } from "@/lib/services/supabase"
 import { format, addDays, startOfWeek, endOfWeek, isSameDay, parseISO } from "date-fns"
 import { ja } from "date-fns/locale"
 import { useRouter } from "next/navigation"

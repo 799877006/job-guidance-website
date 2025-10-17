@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import type { Application, ApplicationStatus } from './types/application';
+import type { Application, ApplicationStatus } from '../types/application';
 
 export async function getApplications() {
   const { data, error } = await supabase

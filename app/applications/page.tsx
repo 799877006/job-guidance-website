@@ -10,12 +10,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ApplicationStatus, ApplicationWithDetails } from '@/lib/types/application';
-import { getApplications, getApplicationsByStatus, createApplication, updateApplication } from '@/lib/application';
+import { getApplications, getApplicationsByStatus, createApplication, updateApplication } from '@/lib/services/application';
 import { format, parseISO } from 'date-fns';
 import { formatInTimeZone } from 'date-fns-tz';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/lib/supabase';
-import { createSchedule, updateSchedule, getStudentSchedule } from '@/lib/student-schedule';
+import { supabase } from '@/lib/services/supabase';
+import { createSchedule, updateSchedule, getStudentSchedule } from '@/lib/services/student-schedule';
 
 // 主要内容组件
 function ApplicationsContent() {

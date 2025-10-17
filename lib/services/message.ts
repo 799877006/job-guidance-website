@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import type { Message, UserMessage, MessageWithStatus } from './types/message';
+import type { Message, UserMessage, MessageWithStatus } from '../types/message';
 
 export async function getUserMessages(userId: string): Promise<MessageWithStatus[]> {
   // 调试：检查认证状态

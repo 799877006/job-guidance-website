@@ -7,9 +7,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ArrowLeft, TrendingUp, Building, CheckCircle, XCircle, Clock, Users, BookOpen, Target } from "lucide-react"
 import { ProtectedRoute } from "@/components/protected-route"
 import { useAuth } from "@/components/auth-provider"
-import { supabase, type Application } from "@/lib/supabase"
+import { supabase, type Application } from "@/lib/services/supabase"
 import { useToast } from "@/hooks/use-toast"
-import { getInstructorBookings } from "@/lib/mentoring"
+import { getInstructorBookings } from "@/lib/services/mentoring"
 
 export default function StatisticsPage() {
   const { user, profile } = useAuth()

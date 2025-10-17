@@ -10,9 +10,9 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Briefcase, Eye, EyeOff } from "lucide-react"
-import { signIn } from "@/lib/auth"
+import { signIn } from "@/lib/services/auth"
 import { useToast } from "@/hooks/use-toast"
-import { supabase } from "@/lib/supabase"
+import { supabase } from "@/lib/services/supabase"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")

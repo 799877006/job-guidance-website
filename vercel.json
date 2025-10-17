@@ -1,6 +1,1 @@
-{
-  "crons": [{
-    "path": "/api/cron/scrape-jobs",
-    "schedule": "0 3 * * *"
-  }]
-} 
+{} 
